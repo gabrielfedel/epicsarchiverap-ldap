@@ -87,6 +87,22 @@ public class ArchivePVAction implements BPLAction {
 			return;
 		}
 		
+		/* Verifies if current user has enough rights to perform this action. If not,
+		 * answers the respective error and exits this method */
+		if (req.getSession(false) == null || req.getSession(false).getAttribute("username") == null ) {
+			
+			HashMap<String, Object> infoValues = new HashMap<String, Object>();
+			resp.setContentType(MimeTypeConstants.APPLICATION_JSON);
+			
+			infoValues.put("validation", "Anonymus user does not have enough privileges!");
+			logger.error(infoValues.get("validation"));
+			try(PrintWriter out = resp.getWriter()) {
+				out.println(JSONValue.toJSONString(infoValues));
+			}
+			return;
+		}
+		
+		
 		logger.info("Archiving pv(s) " + req.getParameter("pv"));
 		String[] pvs = req.getParameter("pv").split(",");
 		String samplingPeriodStr = req.getParameter("samplingperiod");

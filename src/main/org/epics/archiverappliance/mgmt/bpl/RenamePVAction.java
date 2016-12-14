@@ -43,6 +43,22 @@ public class RenamePVAction implements BPLAction {
 
 	@Override
 	public void execute(HttpServletRequest req, HttpServletResponse resp, ConfigService configService) throws IOException {
+		
+		/* Verifies if current user has enough rights to perform this action. If not,
+		 * answers the respective error and exits this method */
+		if (req.getSession(false) == null || req.getSession(false).getAttribute("username") == null ) {
+			
+			HashMap<String, Object> infoValues = new HashMap<String, Object>();
+			resp.setContentType(MimeTypeConstants.APPLICATION_JSON);
+			
+			infoValues.put("validation", "Anonymus user does not have enough privileges!");
+			logger.error(infoValues.get("validation"));
+			try(PrintWriter out = resp.getWriter()) {
+				out.println(JSONValue.toJSONString(infoValues));
+			}
+			return;
+		}
+		
 		String currentPVName = req.getParameter("pv");
 		if(currentPVName == null || currentPVName.equals("")) {
 			resp.sendError(HttpServletResponse.SC_BAD_REQUEST);
