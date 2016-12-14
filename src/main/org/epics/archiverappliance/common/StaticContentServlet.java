@@ -9,6 +9,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.PrintWriter;
 import java.net.URL;
 import java.net.URLConnection;
 import java.net.URLDecoder;
@@ -28,12 +29,15 @@ import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import javax.servlet.http.HttpSession;
 
 import org.apache.log4j.Logger;
 import org.epics.archiverappliance.config.ConfigService;
 import org.epics.archiverappliance.config.ConfigService.STARTUP_SEQUENCE;
 import org.epics.archiverappliance.mgmt.bpl.SyncStaticContentHeadersFooters;
 import org.epics.archiverappliance.retrieval.mimeresponses.MimeResponse;
+import org.epics.archiverappliance.utils.ui.MimeTypeConstants;
+import org.json.simple.JSONValue;
 
 /**
  * Serves static content in the web app...
@@ -51,21 +55,110 @@ public class StaticContentServlet extends HttpServlet {
 	private static final long serialVersionUID = 0L;
 	private static Logger logger = Logger.getLogger(StaticContentServlet.class.getName());
 	private static final int DEFAULT_BUFFER_SIZE = 10240;
-	// We expire content in this many minutes
+
+	/* A session expires in 10 minute in case of user inactivity */
 	private static final long DEFAULT_EXPIRE_TIME = 10*60*1000L;
-	
+
 	private ConfigService configService = null;
 	private String staticContentBasePath = "ui";
 	/**
 	 * List of paths for which we have to do template replacement
 	 */
 	private Set<String> templateReplacementPaths = new HashSet<String>();
-	
+
 	@Override
 	public void init(ServletConfig config) throws ServletException {
 		this.configService = (ConfigService) config.getServletContext().getAttribute(ConfigService.CONFIG_SERVICE_NAME);
 		templateReplacementPaths.add("viewer/index.html");
 		templateReplacementPaths.add("js/mgmt.js");
+	}
+
+	/***
+	 * doPost() handles POST requests sent to the servlet. For our application,
+	 * it handles user authentication tasks, such as: 
+	 * 
+	 * - Verifying sessions: upon receiving a request containing "/requestCurrentUser", it sends 
+	 *  an answer with the user currently logged in.
+	 * - Logging users out: if the request contains the string "/logout", the session for
+	 * that user, in the case it exists, is closed.
+	 * - Logging users in: if the servlet receives an user and a password, it creates and starts
+	 * a new session. This user is granted with removing/adding rights.
+	 * 
+	 * @param request The request to be processed.
+	 * @param response The response to be created.
+	 * @param content Whether the request body should be written (GET) or not (HEAD).
+	 * @throws IOException If something fails at I/O level.
+	 */
+	@Override
+	protected void doPost(HttpServletRequest req, HttpServletResponse resp)
+			throws ServletException, IOException {
+
+		synchronized (this){
+
+			/* Request user operation: sends an answer containing the user which is currently
+			 * logged in */
+			if (req.getPathInfo().contains("/requestCurrentUser")) {
+
+				HttpSession session = req.getSession();
+
+				HashMap<String, Object> infoValues = new HashMap<String, Object>();
+				resp.setContentType(MimeTypeConstants.APPLICATION_JSON);
+
+				System.out.println(session);
+
+				if (session != null && 
+						session.getAttribute("username") != null ) {		
+					infoValues.put("user", session.getAttribute("username"));
+					System.out.println(session.getId());
+				}
+
+				try(PrintWriter out = resp.getWriter()) {
+					out.println(JSONValue.toJSONString(infoValues));
+				}
+
+				return;
+			}
+
+			/* Log out: invalidates current session */
+			if (req.getPathInfo().contains("/logout")) {
+
+				HttpSession session = req.getSession();
+
+				if (session != null) {
+
+					session.invalidate();
+
+					System.out.println(session.getId());
+
+					HashMap<String, Object> infoValues = new HashMap<String, Object>();
+					resp.setContentType(MimeTypeConstants.APPLICATION_JSON);
+
+					infoValues.put("validate", "logged out");
+
+					try(PrintWriter out = resp.getWriter()) {
+						out.println(JSONValue.toJSONString(infoValues));
+					}
+				}
+
+				return;
+			}
+
+			/* Log in: creates a new session for authenticated user PREVIOUSLY 
+			 * ALTERNATIVE: check with LDAP directory here directly (?)
+			 * */
+			HttpSession session = req.getSession(true);
+
+			System.out.println(session.getId());
+			String user = req.getParameter("username"),
+					password = req.getParameter("password");
+
+			req.getSession().setAttribute("username", user);
+			req.getSession().setAttribute("password", password);
+
+			req.getSession().setMaxInactiveInterval(60*20);
+
+			processRequest(req, resp, true);
+		}
 	}
 
 	@Override
@@ -87,7 +180,7 @@ public class StaticContentServlet extends HttpServlet {
 	 */
 	private void processRequest (HttpServletRequest request, HttpServletResponse response, boolean content) throws IOException {
 		// Validate the requested file ------------------------------------------------------------
-		
+
 		// Get requested file by path info - remove the leading '/'
 		String requestedFile = request.getPathInfo();
 		if(requestedFile == null || requestedFile.equals("")) { 
@@ -96,12 +189,12 @@ public class StaticContentServlet extends HttpServlet {
 			response.setHeader("Location", "index.html");
 			return;
 		}
-		
+
 		if(requestedFile.startsWith("/")) { 
 			requestedFile = requestedFile.substring(1, requestedFile.length());
 		}
 		logger.debug("Procesing static content request for " + requestedFile);
-		
+
 
 		// Check if file is actually supplied to the request URL.
 		if (requestedFile == null) {
@@ -118,10 +211,10 @@ public class StaticContentServlet extends HttpServlet {
 			return;
 		}
 
-		
+
 		// URL-decode the file name (might contain spaces and on) and prepare file object.
 		String decodedFilePath = URLDecoder.decode(requestedFile, "UTF-8");
-		
+
 		try(PathSequence pathSeq = new PathSequence(request.getServletContext(), staticContentBasePath, decodedFilePath)) { 
 
 
@@ -131,24 +224,24 @@ public class StaticContentServlet extends HttpServlet {
 				response.sendError(HttpServletResponse.SC_NOT_FOUND);
 				return;
 			}
-			
+
 			logger.debug("Serving static content: " + pathSeq.toString());
-			
+
 			// Prepare some variables. The ETag is an unique identifier of the file.
 			String fileName = pathSeq.getContentDispositionFileName();
 			long length = pathSeq.length();
 			long lastModified = pathSeq.lastModified();
 			String eTag = fileName + "_" + length + "_" + lastModified;
 			long expires = System.currentTimeMillis() + DEFAULT_EXPIRE_TIME;
-			
-//			if(logger.isDebugEnabled()) { 
-//				for(String headerName : Collections.list(request.getHeaderNames())) { 
-//					logger.debug(headerName + " : " + request.getHeaders(headerName).nextElement());
-//				}
-//			}
+
+			//			if(logger.isDebugEnabled()) { 
+			//				for(String headerName : Collections.list(request.getHeaderNames())) { 
+			//					logger.debug(headerName + " : " + request.getHeaders(headerName).nextElement());
+			//				}
+			//			}
 
 			// Validate request headers for caching ---------------------------------------------------
-			
+
 
 			// If-None-Match header should contain "*" or ETag. If so, then return 304.
 			String ifNoneMatch = request.getHeader("If-None-Match");
@@ -332,7 +425,7 @@ public class StaticContentServlet extends HttpServlet {
 
 	// Inner classes ------------------------------------------------------------------------------
 
-	
+
 	/**
 	 * A sequence of paths; some of which may be in a zip file.
 	 * There are multiple possibilities here
@@ -358,21 +451,21 @@ public class StaticContentServlet extends HttpServlet {
 		 * This is what the client is asking for.
 		 */
 		private String fullPathToResource;
-		
-		
+
+
 		private BufferedInputStream content = null;
 		private long length = -1;
 		private long lastModified = -1;
-		
+
 		/**
 		 * Used for debugging purposes; indicates how we served this content.
 		 */
 		private String identifier;
-		
+
 		private PathSequence(ServletContext servletContext, String basePath, String decodedPath) throws IOException {
 			this.fullPathToResource = Paths.get(basePath, decodedPath).toString();
 			logger.debug("Looking for resource " + fullPathToResource);
-			
+
 			// The application server unpacks the WAR and we have a file on the file system
 			String pathOnDisk = servletContext.getRealPath(fullPathToResource);
 			if(pathOnDisk != null) { 
@@ -405,7 +498,7 @@ public class StaticContentServlet extends HttpServlet {
 				this.identifier = pathURL.toString();
 				return;
 			}
-			
+
 			Path pathSoFar = Paths.get(basePath);
 			Path searchPath = Paths.get(decodedPath);
 			int currentIndexIntoPath = 0;
@@ -453,17 +546,17 @@ public class StaticContentServlet extends HttpServlet {
 			}
 		}
 
-		
+
 		public void templateReplace(String decodedPath, InputStream is) throws IOException {
 			logger.debug("Template replacement for " + decodedPath.toString());
-			
+
 			switch(decodedPath) { 
 			case "viewer/index.html": { 
 				HashMap<String, String> templateReplacementsForViewer = new HashMap<String, String>();
 				templateReplacementsForViewer.put("client_retrieval_url_base", 
 						"<script>\n" 
-				+ "window.global_options.retrieval_url_base = '" + configService.getMyApplianceInfo().getDataRetrievalURL() +  "';\n" 
-				+ "</script>");
+								+ "window.global_options.retrieval_url_base = '" + configService.getMyApplianceInfo().getDataRetrievalURL() +  "';\n" 
+								+ "</script>");
 				ByteArrayInputStream replacedContent = SyncStaticContentHeadersFooters.templateReplaceChunksHTML(is, templateReplacementsForViewer);
 				this.content = new BufferedInputStream(replacedContent);
 				this.length = replacedContent.available();
@@ -476,7 +569,7 @@ public class StaticContentServlet extends HttpServlet {
 				templateReplacementsForViewer.put("minimumSamplingPeriod", 
 						"var minimumSamplingPeriod = " + configService.getInstallationProperties().getProperty("org.epics.archiverappliance.mgmt.bpl.ArchivePVAction.minimumSamplingPeriod", "0.1") +  ";\n");
 				ByteArrayInputStream replacedContent = SyncStaticContentHeadersFooters.templateReplaceChunksJavascript(is, templateReplacementsForViewer);
-				
+
 
 				this.content = new BufferedInputStream(replacedContent);
 				this.length = replacedContent.available();
@@ -487,29 +580,29 @@ public class StaticContentServlet extends HttpServlet {
 			}
 		}
 
-		
+
 		boolean exists() { 
 			return this.content != null;
 		}
-		
+
 		String getContentDispositionFileName() throws IOException {
 			Path fullPath = Paths.get(fullPathToResource);
 			int pathComponentsSz = fullPath.getNameCount();
 			return fullPath.subpath(pathComponentsSz-1, pathComponentsSz).toString();
 		}
-		
+
 		long length() { 
 			return this.length;
 		}
-		
+
 		long lastModified() {
 			return this.lastModified;
 		}
-		
+
 		InputStream getInputStream() throws IOException {
 			return this.content;
 		}
-		
+
 		@Override
 		public String toString() {
 			return this.identifier;
