@@ -9,7 +9,7 @@ body {
   width: 1024px;
   margin: 0 auto;
   padding-bottom: 50px;
-  font-family: Helvetica,Arial,'Liberation Sans',FreeSans,sans-serif;
+  
   font-size: 13px;
 }
 
@@ -18,14 +18,19 @@ body {
 }
 
 .pageheader {
-	height: 80px;
+	height: 140px;
 }
 
 .apptitle {
+
+		
+	font-variant: small-caps;
+
+	font-family:"Comic Sans MS", cursive, sans-serif;
 	padding-left: 0.5em;
-	padding-top: 0.75em;
-	font-family: Garamond, serif;
-	color: #0f687e;
+	padding-top: 1.5em;
+	letter-spacing: 4px;
+	color:  rgba(0, 119, 187, 1);
 	font-size: 30px;
 	display: inline-block;
 }
@@ -33,13 +38,15 @@ body {
 #siteimages{
 	float: right;
 	padding-top: 0.75em;
+	padding-right: 0.75em;
 }
 
 div.nav {
 	overflow: hidden;
 	display:block;
 	height: 30px;
-	background: transparent url(../img/nav-bar-bg.gif) repeat-x top left;
+	/* background: transparent url(../img/nav-bar-bg.gif) repeat-x top left; */
+	background-color: rgba(0, 119, 187, 0.8);
 	margin-bottom: 20px;
 }
 
@@ -70,3 +77,5 @@ ul.mainmenu li, ul.mainmenu li a, ul.mainmenu li a:visited {
 .dialogheader {
 	font-size: medium;
 }
+
+
