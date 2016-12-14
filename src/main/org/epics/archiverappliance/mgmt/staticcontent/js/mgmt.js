@@ -6,8 +6,59 @@
  * in file LICENSE that is included with this distribution.
  *******************************************************************************/
 
-// Convert a list of PVs as typed in the #archstatpVNames textarea into a "pv=CSV" type HTTP argument.
 
+function logInOrOut () {
+	
+	if ($("#log").text() == "Log out") {
+		
+		$.ajax({
+			url: '../ui/logout',
+			dataType: 'json',
+			type: 'post',
+			async: false,
+			timeout: 5000,
+			success: function(data) {
+				if (data.validate == "logged out") {
+					checkUser();
+				}  
+			},
+			error: function(jqXHR, textStatus, errorThrown) {
+				alert("An error occured on the server while logging out -- " + textStatus + " -- " + errorThrown);
+			}
+		});
+		
+		return false;
+	}
+	
+	return true;
+}
+
+
+function checkUser() {
+	
+	$.ajax({
+		url: '../ui/requestCurrentUser',
+		dataType: 'json',
+		type: 'post',
+		success: function(data) {
+			if (data.user != undefined) {
+				$("#user").text(data.user);
+				$("#log").text("Log out");
+			} 
+			else {
+				$("#user").text("Anonymus");
+				$("#log").text("Log in");
+			} 
+		},
+		error: function(jqXHR, textStatus, errorThrown) {
+			alert("An error occured on the server while requesting current user -- " + textStatus + " -- " + errorThrown);
+		}
+	});
+	
+}
+
+
+// Convert a list of PVs as typed in the #archstatpVNames textarea into a "pv=CSV" type HTTP argument.
 
 function getPVQueryParam() {
 	var pvText = $('#archstatpVNames').val();
@@ -77,7 +128,11 @@ function archivePVs() {
 		dataType: 'json',
 		data: pvQuery,
 		type: HTTPMethod,
-		success: function() {
+		success: function(data) {
+			
+			if(data.validation != null && data.validation != undefined)
+				alert(data.validation);
+			
 			checkPVStatus();
 		},
 		error: function(jqXHR, textStatus, errorThrown) {
@@ -166,10 +221,10 @@ function archivePVsWithDetails() {
 		}
 		
 		var policyParam = '';
-		if(policySelected == null || policySelected == undefined || policySelected.trim().length <= 0) { 
+		if(policySelected == null || policySelected == undefined || policySelected.length <= 0) { 
 			
 		} else {
-			policyParam = "&policy="+encodeURIComponent(policySelected.trim());
+			policyParam = "&policy="+encodeURIComponent(policySelected);
 		}
 		
 		$("#pvDetailsParams").hide();
@@ -251,8 +306,7 @@ function abortArchiveRequestFromDetails(pvName) {
 }
 
 
-var inRefreshPVStatus = false;
-var skipAutoRefresh = false;
+var refreshPVStatus = false;
 
 // Displays the status of the PVs as typed in the #archstatpVNames textarea in the archstats table.
 function checkPVStatus() {
@@ -270,14 +324,11 @@ function checkPVStatus() {
 	createReportTable(jsonurl, tabledivname,
 			[{'srcAttr' : 'pvName', 'label' : 'PV Name'} , 
 			 {'srcAttr' : 'status', 'label' : 'Status', 'srcFunction' : function(curdata) {
-				 if(skipAutoRefresh) {
-					 return curdata.status;
-				 }
 				 if(curdata.status !== undefined && curdata.status != 'Being archived') { 
-					 if(!inRefreshPVStatus) { 
-						 inRefreshPVStatus = true;
+					 if(!refreshPVStatus) { 
+						 refreshPVStatus = true;
 						 window.setTimeout(function() { 
-							 inRefreshPVStatus = false;
+							 refreshPVStatus = false;
 							 checkPVStatus();
 						 }, 60*1000);
 					 }
@@ -561,49 +612,6 @@ function getPVsByDroppedEventsTypeChange(limit) {
 			]);
 }
 
-function showDialogForDeletePausedPV(pvName) { 
-	console.log("Deleting paused PV" + pvName);
-	
-	// $('#pvStopArchivingParamsDiv').attr('title', 'Are you certain you want to stop archiving PV ' + pvName);
-	$("#pvStopArchivingParams").data("pvName", pvName);
-	$('#pvStopArchivingDeleteData').attr('checked',false);
-	$("#pvStopArchivingParams").show();
-	$("#pvStopArchivingParamsDiv").dialog({
-		height: 250,
-		width: 600,
-		modal: true,
-		title: 'Are you certain you want to stop archiving PV ' + pvName
-		});
-}
-
-function deletePausedPV() {
-	var pvName = $("#pvStopArchivingParams").data("pvName");
-	$("#pvStopArchivingParams").removeData("pvName");
-	$("#pvStopArchivingParams").hide();
-	$("#pvStopArchivingParamsDiv").dialog('close');
-
-	var reportTable = $("#reporttablediv_table");
-	deleteRowAndRefresh(reportTable, function(dataObject) { return dataobj.pvName == pvName; } );
-	
-	var deleteData = $('#pvStopArchivingDeleteData').is(':checked');
-	$.ajax({
-		url: '../bpl/deletePV',
-		dataType: 'json',
-		data: 'pv='+encodeURIComponent(pvName)+'&deleteData='+encodeURIComponent(deleteData),
-		success: function(data, textStatus, jqXHR) {
-			if(data.status != null && data.status != undefined && data.status == "ok") {
-				console.log("Successfully deleted data for pv " + pvName);	
-			} else if(data.validation != null && data.validation != undefined){
-				alert(data.validation);
-			} else {
-				alert("deletePV returned something valid but did not have a status field.");
-			}
-		},
-		error: function(jqXHR, textStatus, errorThrown) {
-			alert("An error in deletePV for " + pvName + " -- " + textStatus + " -- " + errorThrown);
-		}
-	});	
-}
 
 //Get a report on the PV's that are currently paused
 function getPausedPVsReport() {
@@ -614,10 +622,8 @@ function getPausedPVsReport() {
 			 {'srcAttr' : 'instance', 'label' : 'Appliance'},
 			 {'srcAttr' : 'modificationTime', 'label' : 'Info last modified'},
 			 {'srcAttr' : 'pvName', 'sortType' : 'none', 'label' : 'Details', 'srcFunction' : function(dataobject) { return '<a href="pvdetails.html?pv=' + encodeURIComponent(dataobject.pvName) + '" ><img class="imgintable" src="comm/img/details.png"></a>'; }},
-			 {'srcAttr' : 'pvName', 'sortType' : 'none', 'label' : 'Delete',  'srcFunction' : function(dataobject) { return '<a onclick="showDialogForDeletePausedPV(' + "'" + dataobject.pvName + "'" + ')" ><img class="imgintable" src="comm/img/edit-delete.png"></a>'; }},
 			 ], 
 			 {'initialSort' : 1});
-	$("#pvStopArchivingOk").click(deletePausedPV);
 }
 
 

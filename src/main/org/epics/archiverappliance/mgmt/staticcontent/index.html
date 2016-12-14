@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html>
-<title>appliance archiver - Home</title>
+<title>LNLS Archiver - Home</title>
 <head>
 <!-- @begin(main_includes) -->
 <script type="text/javascript" src="comm/js/jquery-1.8.2.min.js"></script>
@@ -14,9 +14,19 @@
 <script type="text/javascript" src="js/mgmt.js"></script>
 </head>
 <body>
+
+<div id="login">
+
+<div id="login_text"> You are currently logged as </div> 
+<h4 id="user">Anonymus</h4> 
+<a href="http://localhost/archiver.html" onclick="return logInOrOut();" id="log"> Login </a>
+
+</div>
+
+
 <!-- @begin(site_header) -->
 <div class="pageheader">
-<span class="apptitle" id="archiveInstallationTitle">LCLS Archiver Appliance</span>
+<span class="apptitle" id="archiveInstallationTitle">LNLS Archiver Appliance</span>
 <span id="siteimages"><img src="comm/img/labLogo.png"></img><img src="comm/img/labLogo2.png"></img></span>
 </div>
 <!-- @end(site_header) -->
@@ -41,9 +51,19 @@
 <div class="page">
 <div id="archivehelpdesk">
 <!-- @begin(site_contact_text) -->
-This is the archiver appliance management console for the LCLS archiver. 
-Please contact Jingchen Zhou for any questions regarding these archiver appliances. 
-For support, please contact Murali Shankar at 650 xxx xxxx or Bob Hall at 650 xxx xxxx. 
+
+This archiver was set up by the LNLS Control Group and it is based on the project developed by the SLAC laboratory.
+
+<br><br>
+
+For further information, refer to the <a href="https://slacmshankar.github.io/epicsarchiver_docs/index.html">project's official website</a> or send an email
+to <a href="mailto:gustavo.pinton@lnls.br">gustavo.pinton@lnls.br</a> or <a href="mailto:eduardo.coelho@lnls.br">eduardo.coelho@lnls.br</a>.
+
+<br><br>
+
+Additionally, we have developed our own version of <a href="http://controlsystemstudio.org/">Control System Studio</a>. If you want to try it, feel free to contact us!
+
+<br>
 <!-- @end(site_contact_text) -->
 </div>
 
@@ -105,7 +125,8 @@ To check the status of or to archive some PV's, please type in some PV names her
 
 <script type="text/javascript">
 $(document).ready(function() {
-  $("#pvDetailsParams").hide();
+
+ $("#pvDetailsParams").hide();
 
   // See if we have any pv names in session storage
   if(sessionStorage && 'archstatpVNames' in sessionStorage) {
@@ -123,6 +144,8 @@ $(document).ready(function() {
   
   // Set up help
   $("#help").click(function() { window.open('help/userguide.html#ArchivePV'); } );
+  
+  checkUser();
 });
 </script>
 

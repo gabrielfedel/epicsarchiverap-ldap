@@ -1,7 +1,29 @@
+#login {
+	padding-top: 5px;
+	width: 100%;
+}
+
+#login_text {
+	float: left;
+	margin:0px;
+	margin-left:10px;
+}
+
+
+#user {
+	position:relative;
+	float: left;
+	margin:0px;
+	margin-right:10px;
+	margin-left:10px;
+}
+
+
 #archivePVDiv {
 	margin-top: 0.5em;	
 	padding-left: 10px;
 }
+
 
 #archstatpVNamesdiv {
 	padding-left: 5px;
@@ -75,11 +97,11 @@
 
 
 .reporttable tbody tr:nth-child(2n) {
-	background: #99cedb;
+	background: rgba(0, 119, 187, 0.4);
 }
 
 .reporttable tbody tr.rtbleven { 
-	background: #99cedb;
+	background: #0077bb;
 }
 
 .reporttable tbody tr td a img {
@@ -140,19 +162,23 @@
 }
 
 .archtabl_asc {
-	background: #99cedb url('../comm/img/sort_asc.png') no-repeat center right;
+	background: rgba(0, 119, 187, 0.8) url('../comm/img/sort_asc.png') no-repeat center right;
+	color:white;
 }
 
 .archtabl_desc {
-	background: #99cedb url('../comm/img/sort_desc.png') no-repeat center right;
+	background: rgba(0, 119, 187, 0.8) url('../comm/img/sort_desc.png') no-repeat center right;
+	color:white;
 }
 
 .archtabl_unsorted { 
-	background: #99cedb url('../comm/img/sort_both.png') no-repeat center right;
+	background: rgba(0, 119, 187, 0.8) url('../comm/img/sort_both.png') no-repeat center right;
+	color:white;
 }
 
 .archtabl_nosort { 
-	background: #99cedb;
+	background: rgba(0, 119, 187, 0.8);
+	color:white;
 }
 
 .detailsviewheader {
@@ -204,7 +230,7 @@ img.disabled {
 
 
 #pvDetailsTable tbody tr:nth-child(2n) {
-	background: #99cedb;
+	background: rgba(0, 119, 187, 0.2);
 }
 
 #pvDetailsName {
