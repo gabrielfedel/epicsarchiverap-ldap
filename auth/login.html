@@ -1,0 +1,40 @@
+<html>
+<head>
+<script src="scripts/archiver.js"></script>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script>
+<link rel="stylesheet" type="text/css" href="archiver.css">
+</head>
+
+<body>
+
+<img src="img/labLogo.png" id="logo1">
+<img src="img/labLogo2.png" id="logo2">
+
+<div id="contents">
+	<form id="login_form" method="POST" action="http://10.0.4.69:11995/mgmt/ui/index.html" onSubmit="return authorize()">
+	
+	<div id="row">
+		<div id="label">Login:</div><input type="text" id="username" name="username" class="login_editbox" >
+	</div>
+
+	<br>
+	
+	<div id="row">
+		<div id="label">Password:</div><input type="password" id="password" name="password" class="login_editbox">
+	</div>
+	
+	<br>
+	
+	<div id="row">
+		<input type="submit" name="submit_form" value="Ok" class="button">
+	</div>
+	
+	<div id="row">
+		<a href="http://10.0.4.69:11995/mgmt/ui/index.html" id="link"> Skip authentication >> </a>
+	</div>
+	
+	</form>
+</div>
+
+</body>
+</html>
