@@ -243,7 +243,11 @@ function archivePVsWithDetails() {
 			dataType: 'json',
 			data: pvQuery + samplingPeriodParam+samplingMethodParam+controllingPVParam+policyParam,
 			type: HTTPMethod,
-			success: function() {
+			success: function(data) {
+
+				if(data.validation != null && data.validation != undefined)
+					alert(data.validation);
+
 				checkPVStatus();
 			},
 			error: function(jqXHR, textStatus, errorThrown) {
