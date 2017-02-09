@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html>
-<title>LNLS Archiver - Appliances</title>
+<title>LNLS Control Group Archiver - Appliances</title>
 <head>
 <!-- @begin(main_includes) -->
 <script type="text/javascript" src="comm/js/jquery-1.8.2.min.js"></script>
@@ -19,6 +19,16 @@
 
 </head>
 <body>
+
+<div id="login">
+
+<div id="login_text"> You are currently logged as </div> 
+<h4 id="user">Anonymus</h4> 
+<a href="http://10.0.4.69/login.html" onclick="return logInOrOut();" id="log"> Login </a>
+
+</div>
+
+
 <!-- @begin(site_header) -->
 <div class="pageheader">
 <span class="apptitle" id="archiveInstallationTitle">LNLS Archiver Appliance</span>
@@ -71,10 +81,13 @@ $(document).ready(function() {
 	getInstanceMetrics();
 
     // Set up help
-	$("#help").click(function() { window.open('help/userguide.html#Appliances'); } );	
+	$("#help").click(function() { window.open('help/userguide.html#Appliances'); } );
+
+	checkUser();	
 });
 </script>
 
 
 </body>
 </html>
+

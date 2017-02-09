@@ -15,9 +15,19 @@
 <script type="text/javascript" src="js/mgmt.js"></script>
 </head>
 <body>
+
+<div id="login">
+
+<div id="login_text"> You are currently logged as </div> 
+<h4 id="user">Anonymus</h4> 
+<a href="http://10.0.4.69/login.html" onclick="return logInOrOut();" id="log"> Login </a>
+
+</div>
+
+
 <!-- @begin(site_header) -->
 <div class="pageheader">
-<span class="apptitle" id="archiveInstallationTitle">LCLS Archiver Appliance</span>
+<span class="apptitle" id="archiveInstallationTitle">LNLS Archiver Appliance</span>
 <span id="siteimages"><img src="comm/img/labLogo.png"></img><img src="comm/img/labLogo2.png"></img></span>
 </div>
 <!-- @end(site_header) -->
@@ -148,6 +158,9 @@ $(document).ready(function() {
   
    // Set up help
 	$("#help").click(function() { window.open('help/userguide.html#Integrations'); } );
+
+	checkUser();
+
 });
 </script>
 
@@ -160,3 +173,4 @@ $(document).ready(function() {
 
 </body>
 </html>
+
