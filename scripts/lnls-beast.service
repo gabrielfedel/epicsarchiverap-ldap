@@ -1,0 +1,11 @@
+[Unit]
+Description=Start LNLS Alarm Server
+After=mysql.service
+
+[Service]
+Type=simple
+WorkingDirectory=/home/opr23/Software/BEAST
+ExecStart=/home/opr23/Software/BEAST/AlarmServer
+
+[Install]
+WantedBy=multi-user.target
