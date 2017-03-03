@@ -1,15 +1,16 @@
 html {
-  background: #b2b2b2;
+  background: lightgrey;
 }
 
 
 body {
   background: white;
   color: black;
-  width: 1024px;
+  width: 90%;
   margin: 0 auto;
   padding-bottom: 50px;
   
+  font-family: "Helvetica Neue", "Helvetica", "Arial", "sans-serif";
   font-size: 13px;
 }
 
@@ -19,15 +20,13 @@ body {
 
 .pageheader {
 	height: 140px;
+	width: 95%;
+	padding-left: 2.5%;
 }
 
 .apptitle {
 
-		
-	font-variant: small-caps;
-
-	font-family:"Comic Sans MS", cursive, sans-serif;
-	padding-left: 0.5em;
+	
 	padding-top: 1.5em;
 	letter-spacing: 4px;
 	color:  rgba(0, 119, 187, 1);
