@@ -18,23 +18,25 @@ import org.json.simple.JSONObject;
 public class ProcessMetrics {
 	private static final int MINUTES_IN_DAY = 24*60;
 	private static Logger logger = Logger.getLogger(ProcessMetrics.class.getName());
-	
-	public ProcessMetrics() { 
-		
+
+	public ProcessMetrics() {
+
 	}
-	
+
 	public class ProcessMetric {
 		long timeInEpochSeconds;
 		double systemLoadAverage;
 		double heapUsedPercent;
-		
-		ProcessMetric() { 
+
+		ProcessMetric() {
 			this.timeInEpochSeconds = TimeUtils.getCurrentEpochSeconds();
 			systemLoadAverage = ManagementFactory.getOperatingSystemMXBean().getSystemLoadAverage();
 			MemoryUsage memoryUsage = ManagementFactory.getMemoryMXBean().getHeapMemoryUsage();
 			heapUsedPercent = (((double) memoryUsage.getUsed())/memoryUsage.getMax())*100;
+		        logger.debug("System Load Average is " + systemLoadAverage);
+		        logger.debug("Heap maximum capacity is " + memoryUsage.getMax() + " bytes");
 		}
-		
+
 		public long getTimeInEpochSeconds() {
 			return timeInEpochSeconds;
 		}
@@ -45,10 +47,10 @@ public class ProcessMetrics {
 			return heapUsedPercent;
 		}
 	}
-	
+
 	LinkedList<ProcessMetric> processMetrics = new LinkedList<ProcessMetric>();
-	
-	public void takeMeasurement() { 
+
+	public void takeMeasurement() {
 		try {
 			ProcessMetric metric = new ProcessMetric();
 			if(processMetrics.size() >= MINUTES_IN_DAY) {
@@ -61,7 +63,7 @@ public class ProcessMetrics {
 			}
 			processMetrics.add(metric);
 			assert(processMetrics.size() <= MINUTES_IN_DAY);
-		} catch (Exception ex) { 
+		} catch (Exception ex) {
 			logger.error("Exception retrieving MBean information", ex);
 		}
 	}
