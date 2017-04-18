@@ -21,16 +21,17 @@ import org.json.simple.JSONValue;
  *
  */
 public class EngineChannelStatus implements JSONAware {
+
 	private String pvName = "";
 	private long epochSecondsOfLastEvent = 0L;
 	private long lastRotateLogsEpochSeconds = 0L;
 	private boolean isMonitored = true;
-	private double samplingPeriod = 0;
+	private float samplingPeriod = 0;
 	private long connectionFirstEstablishedEpochSeconds = 0L;
 	private long connectionLastRestablishedEpochSeconds = 0L;
 	private long connectionLossRegainCount = 0;
 	private boolean connectionState = false;
-	
+
 	public EngineChannelStatus(PVMetrics metrics) {
 		this.pvName = metrics.getPvName();
 		this.epochSecondsOfLastEvent = metrics.getSecondsOfLastEvent();
@@ -70,7 +71,7 @@ public class EngineChannelStatus implements JSONAware {
 		this.isMonitored = isMonitored;
 		return this;
 	}
-	public double getSamplingPeriod() {
+	public float getSamplingPeriod() {
 		return samplingPeriod;
 	}
 	public EngineChannelStatus setSamplingPeriod(float samplingPeriod) {
@@ -119,7 +120,7 @@ public class EngineChannelStatus implements JSONAware {
 		obj.put("pvName", pvName);
 		obj.put("status", "Being archived");
 		obj.put("isMonitored", Boolean.toString(isMonitored));
-		obj.put("samplingPeriod", Double.toString(samplingPeriod));
+		obj.put("samplingPeriod", Float.toString(samplingPeriod));
 		obj.put("connectionState", Boolean.toString(connectionState));
 		obj.put("lastEvent", TimeUtils.convertToHumanReadableString(epochSecondsOfLastEvent));
 		obj.put("lastRotateLogs", TimeUtils.convertToHumanReadableString(lastRotateLogsEpochSeconds));

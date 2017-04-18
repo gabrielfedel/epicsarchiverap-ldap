@@ -51,7 +51,7 @@ public class PVMetrics {
 	/**is this pv archived in monitor mode?*/
 	private boolean isMonitor = false;
 	/**the sample period*/
-	private double samplingPeriod = 0;
+	private float samplingPeriod = 0;
 	/**is this pv connected?*/
 	private boolean isConnected = false;
 	/**the time of last event and it is the the number of seconds since 1970/01/01*/
@@ -355,7 +355,7 @@ public class PVMetrics {
 	 * 
 	 * @return the sample period
 	 */
-	public double getSamplingPeriod() {
+	public float getSamplingPeriod() {
 		return samplingPeriod;
 	}
 
@@ -363,7 +363,8 @@ public class PVMetrics {
      * set the sample period
      * @param samplingPeriod  in second
      */
-	public void setSamplingPeriod(double samplingPeriod) {
+	public void setSamplingPeriod(float samplingPeriod) {
+		logger.debug ("Setting sampling period to " + samplingPeriod);
 		this.samplingPeriod = samplingPeriod;
 	}
 

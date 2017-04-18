@@ -17,14 +17,14 @@ public class SampleMode
 	
 	final private double delta;
 	
-	final private double period;
+	final private float period;
 
 	/** Initialize
 	 *  @param monitor Monitor/subscription or active scan?
 	 *  @param delta Value change threshold
 	 *  @param period (Expected) update period in seconds
 	 */
-	public SampleMode(final boolean monitor, final double delta, final double period)
+	public SampleMode(final boolean monitor, final double delta, final float period)
     {
 	    this.monitor = monitor;
 	    this.delta = delta;
@@ -33,7 +33,7 @@ public class SampleMode
 	    // in engine sample buffer computation.
 	    // For now 0.1 is the fixed minimum
 	    if (period <= 0.0)
-	    	this.period = 0.1;
+	    	this.period = 0.1f;
 	    else
 	    	this.period = period;
     }
@@ -51,7 +51,7 @@ public class SampleMode
     }
 
 	/** @return Scan period resp. expected monitor period in seconds */
-	public double getPeriod()
+	public float getPeriod()
     {
     	return period;
     }

@@ -91,7 +91,7 @@ public class ArchiveEngine {
 
 		// Determine buffer capacity
 		double write_period = configservice.getEngineContext().getWritePeriod();
-		double pvSamplingPeriod = sample_mode.getPeriod();
+		float pvSamplingPeriod = sample_mode.getPeriod();
 		if(pvSamplingPeriod <= 0.0) {
 			logger.warn("Sampling period is invalid " + pvSamplingPeriod + ". Resetting this to " + PolicyConfig.DEFAULT_MONITOR_SAMPLING_PERIOD);
 			pvSamplingPeriod = PolicyConfig.DEFAULT_MONITOR_SAMPLING_PERIOD;
@@ -110,7 +110,7 @@ public class ArchiveEngine {
 		if (sample_mode.isMonitor()) {
 			if (sample_mode.getDelta() > 0) {
 				channel = new DeltaArchiveChannel(name, writer, enablement, buffer_capacity, last_sampleTimestamp, pvSamplingPeriod, sample_mode.getDelta(),configservice, archdbrtype, controlPVname, JCACommandThreadID, usePVAccess);
-			} else { 
+			} else {
 				channel = new MonitoredArchiveChannel(name, writer, enablement, buffer_capacity, last_sampleTimestamp, pvSamplingPeriod, configservice, archdbrtype, controlPVname, JCACommandThreadID, usePVAccess);
 			}
 		} else {
@@ -135,7 +135,7 @@ public class ArchiveEngine {
 		if (!engineContext.isWriteThreadStarted()) {
 			engineContext.startWriteThread(configservice);
 		}
-		
+
 		if (mode == SamplingMethod.SCAN) {
 			SampleMode scan_mode2 = new SampleMode(false, 0, samplingPeriod);
 			ArchiveChannel channel = ArchiveEngine.addChannel(pvName, writer,

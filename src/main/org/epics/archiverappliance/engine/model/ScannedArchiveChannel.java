@@ -32,12 +32,12 @@ import org.epics.archiverappliance.data.VectorValue;
 public class ScannedArchiveChannel extends ArchiveChannel implements Runnable {
 	private static final Logger logger = Logger.getLogger(ScannedArchiveChannel.class);
 	/** Scan period in seconds */
-	final private double scan_period;
+	final private float scan_period;
 
 	/** @see ArchiveChannel#ArchiveChannel(String, Writer, Enablement,int,Timestamp,double,ConfigService,ArchDBRTypes,String,boolean)*/
 	public ScannedArchiveChannel(final String name, final Writer writer,
 			Enablement enablement, final int buffer_capacity,
-			final Timestamp last_timeestamp, final double scan_period,
+			final Timestamp last_timeestamp, final float scan_period,
 			final ConfigService configservice, final ArchDBRTypes archdbrtype,
 			final String controlPVname, final int commandThreadID, final boolean usePVAccess)
 			throws Exception {
@@ -50,7 +50,7 @@ public class ScannedArchiveChannel extends ArchiveChannel implements Runnable {
 	}
 
 	/** @return Scan period in seconds */
-	final public double getPeriod() {
+	final public float getPeriod() {
 		return scan_period;
 	}
 

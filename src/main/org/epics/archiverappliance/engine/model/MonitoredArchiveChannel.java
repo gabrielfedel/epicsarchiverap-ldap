@@ -26,19 +26,21 @@ import org.epics.archiverappliance.data.DBRTimeEvent;
 public class MonitoredArchiveChannel extends ArchiveChannel {
 	private static final Logger logger = Logger.getLogger(MonitoredArchiveChannel.class);
 	/** Estimated period of change in seconds */
-	final private double period_estimate;
+	final private float period_estimate;
 
 	/** @see ArchiveChannel#ArchiveChannel(String, Writer, Enablement,int,Timestamp,double,ConfigService,ArchDBRTypes,String,boolean) */
 	public MonitoredArchiveChannel(final String name, final Writer writer,
 			final Enablement enablement, final int buffer_capacity,
 			final Timestamp last_archived_timestamp,
-			final double period_estimate, final ConfigService configservice,
+			final float period_estimate, final ConfigService configservice,
 			final ArchDBRTypes archdbrtype, final String controlPVname,
 			final int commandThreadID, final boolean usePVAccess) throws Exception {
 		super(name, writer, enablement, buffer_capacity,
 				last_archived_timestamp, configservice, archdbrtype,
 				controlPVname, commandThreadID, usePVAccess);
 		this.period_estimate = period_estimate;
+
+		logger.debug ("MonitoredArchiveChannel setting sampling period to " + period_estimate);
 		this.pvMetrics.setSamplingPeriod(period_estimate);
 		this.pvMetrics.setMonitor(true);
 	}
