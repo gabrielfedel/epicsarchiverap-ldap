@@ -1,15 +1,7 @@
-html {
-  background: #b2b2b2;
-}
-
-
 body {
   background: white;
-  color: black;
-  width: 1024px;
-  margin: 0 auto;
-  padding-bottom: 50px;
-  font-family: Helvetica,Arial,'Liberation Sans',FreeSans,sans-serif;
+
+  font-family: "Helvetica Neue", "Helvetica", "Arial", "sans-serif";
   font-size: 13px;
 }
 
@@ -18,14 +10,16 @@ body {
 }
 
 .pageheader {
-	height: 80px;
+	height: 140px;
+	width: 95%;
+	padding-left: 2.5%;
 }
 
 .apptitle {
-	padding-left: 0.5em;
-	padding-top: 0.75em;
-	font-family: Garamond, serif;
-	color: #0f687e;
+
+	padding-top: 1.5em;
+	letter-spacing: 4px;
+	color:  rgba(0, 119, 187, 1);
 	font-size: 30px;
 	display: inline-block;
 }
@@ -33,13 +27,19 @@ body {
 #siteimages{
 	float: right;
 	padding-top: 0.75em;
+	padding-right: 0.75em;
+}
+
+#siteimages img {
+        height: 110px;
 }
 
 div.nav {
 	overflow: hidden;
 	display:block;
 	height: 30px;
-	background: transparent url(../img/nav-bar-bg.gif) repeat-x top left;
+	/* background: transparent url(../img/nav-bar-bg.gif) repeat-x top left; */
+	background-color: rgba(0, 119, 187, 0.8);
 	margin-bottom: 20px;
 }
 
@@ -70,3 +70,5 @@ ul.mainmenu li, ul.mainmenu li a, ul.mainmenu li a:visited {
 .dialogheader {
 	font-size: medium;
 }
+
+

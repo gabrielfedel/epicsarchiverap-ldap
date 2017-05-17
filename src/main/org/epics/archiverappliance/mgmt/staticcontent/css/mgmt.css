@@ -1,21 +1,26 @@
 #archivePVDiv {
-	margin-top: 0.5em;	
-	padding-left: 10px;
+	margin-top: 20px;	
+	padding-left: 2.5%;
+	width: 95%;
 }
 
+
 #archstatpVNamesdiv {
-	padding-left: 5px;
+	padding-left: 0;
+	padding-right: 0;
 	padding-top: 10px;
-	padding-bottom: 10px;
+	padding-bottom: 20px;
+	width: 95%;
 }
 
 #archstatpVNames {
-    width: 600px;
+	width: 100%;
 	height: 100px;
 }
 
 #archivehelpdesk {
-	padding-left: 10px;
+	padding: 0 0 0 2.5%;
+	width: 95%;
 }
 
 #archstatsdiv {
@@ -50,6 +55,7 @@
 }
 
 #reporttablediv {
+	width: 95%;
 	padding-left: 1.0em;
 	padding: none;
 	margin-top: 1.0em;
@@ -57,11 +63,12 @@
 
 .reporttable {
 	border-collapse: collapse;
+    width: 100%;
 }
 
 .reporttable th, td {
 	border: thin solid black;
-	padding: 0.25em;
+	padding: 10px;
 	font-weight: normal;
 	font-size: small;
 }
@@ -75,11 +82,11 @@
 
 
 .reporttable tbody tr:nth-child(2n) {
-	background: #99cedb;
+	background: rgba(0, 119, 187, 0.4);
 }
 
 .reporttable tbody tr.rtbleven { 
-	background: #99cedb;
+	background: #0077bb;
 }
 
 .reporttable tbody tr td a img {
@@ -140,19 +147,23 @@
 }
 
 .archtabl_asc {
-	background: #99cedb url('../comm/img/sort_asc.png') no-repeat center right;
+	background: rgba(0, 119, 187, 0.8) url('../comm/img/sort_asc.png') no-repeat center right;
+	color:white;
 }
 
 .archtabl_desc {
-	background: #99cedb url('../comm/img/sort_desc.png') no-repeat center right;
+	background: rgba(0, 119, 187, 0.8) url('../comm/img/sort_desc.png') no-repeat center right;
+	color:white;
 }
 
 .archtabl_unsorted { 
-	background: #99cedb url('../comm/img/sort_both.png') no-repeat center right;
+	background: rgba(0, 119, 187, 0.8) url('../comm/img/sort_both.png') no-repeat center right;
+	color:white;
 }
 
 .archtabl_nosort { 
-	background: #99cedb;
+	background: rgba(0, 119, 187, 0.8);
+	color:white;
 }
 
 .detailsviewheader {
@@ -204,7 +215,7 @@ img.disabled {
 
 
 #pvDetailsTable tbody tr:nth-child(2n) {
-	background: #99cedb;
+	background: rgba(0, 119, 187, 0.2);
 }
 
 #pvDetailsName {
