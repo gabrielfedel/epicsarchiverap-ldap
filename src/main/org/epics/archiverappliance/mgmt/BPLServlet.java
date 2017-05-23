@@ -40,6 +40,7 @@ import org.epics.archiverappliance.mgmt.bpl.ExportConfigForThisInstance;
 import org.epics.archiverappliance.mgmt.bpl.GetAllPVs;
 import org.epics.archiverappliance.mgmt.bpl.GetApplianceInfo;
 import org.epics.archiverappliance.mgmt.bpl.GetAppliancesInCluster;
+import org.epics.archiverappliance.mgmt.bpl.GetLoginUsername;
 import org.epics.archiverappliance.mgmt.bpl.GetMatchingPVsForAppliance;
 import org.epics.archiverappliance.mgmt.bpl.GetPVStatusAction;
 import org.epics.archiverappliance.mgmt.bpl.GetPVTypeInfo;
@@ -51,6 +52,8 @@ import org.epics.archiverappliance.mgmt.bpl.ImportChannelArchiverConfigAction;
 import org.epics.archiverappliance.mgmt.bpl.ImportConfig;
 import org.epics.archiverappliance.mgmt.bpl.ImportConfigForAppliance;
 import org.epics.archiverappliance.mgmt.bpl.ImportDataFromPlugin;
+import org.epics.archiverappliance.mgmt.bpl.LoginUser;
+import org.epics.archiverappliance.mgmt.bpl.Logout;
 import org.epics.archiverappliance.mgmt.bpl.ModifyMetaFieldsAction;
 import org.epics.archiverappliance.mgmt.bpl.NamedFlagsGet;
 import org.epics.archiverappliance.mgmt.bpl.NamedFlagsSet;
@@ -107,6 +110,11 @@ public class BPLServlet extends HttpServlet {
 	private static LinkedList<String> actionsSequenceForDocs = new LinkedList<String>();
 	
 	static {
+		
+		// BPL related to login/logout action
+		addAction("/getLoginUsername", GetLoginUsername.class);
+		addAction("/logout", Logout.class);
+		
 		// BPL related to PVs/appliances etc
 		addAction("/getAllPVs", GetAllPVs.class);
 		addAction("/getPVStatus", GetPVStatusAction.class);
@@ -217,6 +225,8 @@ public class BPLServlet extends HttpServlet {
 		addPostAction("/archivedPVs", ArchivedPVsAction.class);
 		addPostAction("/archivedPVsForThisAppliance", ArchivedPVsAction.class);
 		addPostAction("/archivedPVsNotInList", ArchivedPVsNotInListAction.class);
+		
+		addPostAction("/login", LoginUser.class);
 	}
 	
 	@Override
