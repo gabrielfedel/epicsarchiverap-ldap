@@ -15,6 +15,16 @@ body {
 	padding-left: 2.5%;
 }
 
+#user {
+	font-weight: bold;
+}
+
+#log {
+        cursor: pointer;
+	color: blue;
+	text-decoration: underline;
+}
+
 .apptitle {
 
 	padding-top: 1.5em;
@@ -31,7 +41,7 @@ body {
 }
 
 #siteimages img {
-        height: 110px;
+        height: 100px;
 }
 
 div.nav {

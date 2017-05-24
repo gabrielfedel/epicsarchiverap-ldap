@@ -11,10 +11,12 @@
 <!-- @end(main_includes) -->
 <link type="text/css" href="css/mgmt.css" rel="Stylesheet" />	
 <script type="text/javascript" src="js/mgmt.js"></script>
+<script type="text/javascript" src="js/login.js"></script>
 </head>
 <body>
 <!-- @begin(site_header) -->
 <div class="pageheader">
+You are currently logged as <span id="user">Anonymus</span>. <a href="login.html" id="log" onclick="return signUser();">Login</a> <br>
 <span class="apptitle" id="archiveInstallationTitle">LNLS Archiver Appliance</span>
 <span id="siteimages"><img src="comm/img/labLogo.png"></img><img src="comm/img/labLogo2.png"></img></span>
 </div>
@@ -124,6 +126,8 @@ $(document).ready(function() {
   $('#pvStopArchivingParams').hide();
   $('#pvRenameParams').hide();
   $('#pvReshardParams').hide();
+
+  queryUser();
 });
 
 $("#pvDetailsParamChange").click(function() {

@@ -1,0 +1,36 @@
+<html>
+<head>
+<script type="text/javascript" src="comm/js/jquery-1.8.2.min.js"></script>
+<script type="text/javascript" src="js/login.js"></script>
+<link type="text/css" href="comm/css/main.css" rel="Stylesheet" />
+</head>
+<body>
+
+<div class="pageheader">
+You are currently logged as <span id="user">Anonymus</span>. <a href="login.html" id="log" onclick="return signUser();">Login</a> <br>
+<span id="siteimages"><img src="comm/img/labLogo.png"></img><img src="comm/img/labLogo2.png"></img></span>
+</div>
+
+<center>
+<table>
+<tr>
+<td>First name:</td> <td> <input type="text" name="username"></td>
+</tr>
+<tr><td> Password: </td> <td><input type="password" name="password"> </td>
+</tr>
+<tr>
+<td></td><td><input type="submit" id="submit" value="Sign in"></td>
+</tr>
+</table>
+</center>
+
+
+<script type="text/javascript">
+$(document).ready(function() {
+
+        $("#submit").click({user:$('input[name=username]'), password: $('input[name=password]'), redirectURL: document.referrer}, attemptSignUser);
+});
+</script>
+
+</body>
+</html>
