@@ -38,7 +38,7 @@
        <url-pattern>/bpl/consolidateDataForPV</url-pattern>
        <url-pattern>/bpl/deletePV</url-pattern>
        <url-pattern>/bpl/abortArchivingPV</url-pattern>
-       <url-pattern>/bpl/abortArchivingPVForThisAppliance</url-pattern>
+       <!-- <url-pattern>/bpl/abortArchivingPVForThisAppliance</url-pattern> -->
        <url-pattern>/bpl/changeArchivalParameters</url-pattern>
        <url-pattern>/bpl/renamePV</url-pattern>
        <url-pattern>/bpl/reshardPV</url-pattern>
