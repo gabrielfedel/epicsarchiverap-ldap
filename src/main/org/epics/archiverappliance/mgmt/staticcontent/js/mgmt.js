@@ -201,7 +201,8 @@ function archivePVsWithDetails() {
 }
 
 // We assume that dataobject has a attribute called pvName and that we are in the mgmt/ui context. 
-var dataRetrievalURL = null;
+//var dataRetrievalURL = null;
+var dataRetrievalURL = "http:" + window.location.href.split(":")[1] + ":31998/retrieval"
 function quickChartButton(dataobject) {
 	var canvasSupported = !!window.HTMLCanvasElement;
 	if(!canvasSupported) { 
