@@ -227,7 +227,7 @@ function quickChartButton(dataobject) {
 		alert("Cannot determine data retrieval URL");
 	}
 	
-	return '<a href="' + dataRetrievalURL + '/ui/viewer/archViewer.html?pv=' + encodeURIComponent(dataobject.pvName) + '" ><img class="imgintable" src="comm/img/chart.png"/></a>';
+    return '<div style = "text-align: center;"><a target="_blank" href="' + dataRetrievalURL + '/ui/archiver-viewer/index.html?pv=' + encodeURIComponent(dataobject.pvName) + '" >Option #1</a> | <a target="_blank" href="' + dataRetrievalURL + '/ui/viewer/archViewer.html?pv=' + encodeURIComponent(dataobject.pvName) + '" >Option #2</a></div>';
 }
 
 
