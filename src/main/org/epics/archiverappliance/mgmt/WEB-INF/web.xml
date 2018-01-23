@@ -3,10 +3,6 @@
        <filter-name>MgmtUIFilter</filter-name>
        <filter-class>org.epics.archiverappliance.mgmt.MgmtUIFilter</filter-class>
    </filter>
-   <filter>
-       <filter-name>MgmtAuthenticationFilter</filter-name>
-       <filter-class>org.epics.archiverappliance.mgmt.MgmtAuthenticationFilter</filter-class>
-   </filter>
    <servlet>
         <servlet-name>StaticContent</servlet-name>
         <servlet-class>org.epics.archiverappliance.common.StaticContentServlet</servlet-class>
@@ -29,19 +25,6 @@
        <filter-name>MgmtUIFilter</filter-name>
        <url-pattern>/ui/*</url-pattern>
        <dispatcher>REQUEST</dispatcher>
-    </filter-mapping>
-    <filter-mapping>
-       <filter-name>MgmtAuthenticationFilter</filter-name>
-       <url-pattern>/bpl/archivePV</url-pattern>
-       <url-pattern>/bpl/pauseArchivingPV</url-pattern>
-       <url-pattern>/bpl/pauseArchivingPV</url-pattern>
-       <url-pattern>/bpl/consolidateDataForPV</url-pattern>
-       <url-pattern>/bpl/deletePV</url-pattern>
-       <url-pattern>/bpl/abortArchivingPV</url-pattern>
-       <!-- <url-pattern>/bpl/abortArchivingPVForThisAppliance</url-pattern> -->
-       <url-pattern>/bpl/changeArchivalParameters</url-pattern>
-       <url-pattern>/bpl/renamePV</url-pattern>
-       <url-pattern>/bpl/reshardPV</url-pattern>
     </filter-mapping>
 	<welcome-file-list>
 		<welcome-file>/ui/redirect.html</welcome-file>
