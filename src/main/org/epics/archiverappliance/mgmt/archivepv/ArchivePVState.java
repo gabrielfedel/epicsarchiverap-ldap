@@ -48,7 +48,7 @@ public class ArchivePVState {
 		this.myIdentity = this.configService.getMyApplianceInfo().getIdentity();
 	}
 
-	public void nextStep() {
+	public synchronized void nextStep() {
 		try { 
 			logger.debug("Archive workflow for pv " + pvName + " in state " + currentState);
 				switch(currentState) {
@@ -255,7 +255,7 @@ public class ArchivePVState {
 	}
 
 	public boolean hasNotConnectedSoFar() {
-		return this.currentState.equals(ArchivePVState.ArchivePVStateMachine.METAINFO_REQUESTED) || this.currentState.equals(ArchivePVState.ArchivePVStateMachine.ABORTED);
+		return this.currentState.equals(ArchivePVState.ArchivePVStateMachine.START) || this.currentState.equals(ArchivePVState.ArchivePVStateMachine.METAINFO_REQUESTED) || this.currentState.equals(ArchivePVState.ArchivePVStateMachine.ABORTED);
 	}
 
 	/**
@@ -373,9 +373,10 @@ public class ArchivePVState {
 				}
 			} else {
 				logger.debug("We are not archiving the real PV " + realName + " which is the alias for " + pvName + ". Aborting this request and asking to archive " + realName);
+				configService.addAlias(pvName, realName);
 				ByteArrayOutputStream bos = new ByteArrayOutputStream();
 				PrintWriter out = new PrintWriter(bos);
-				ArchivePVAction.archivePV(out, realName, userSpec.isUserOverrideParams(), userSpec.getUserSpecifedsamplingMethod(), userSpec.getUserSpecifedSamplingPeriod(), userSpec.getControllingPV(), userSpec.getPolicyName(), pvName, userSpec.isSkipCapacityPlanning(), configService, ArchivePVAction.getFieldsAsPartOfStream(configService));
+				ArchivePVAction.archivePV(out, realName, userSpec.isUserOverrideParams(), userSpec.getUserSpecifedsamplingMethod(), userSpec.getUserSpecifedSamplingPeriod(), userSpec.getControllingPV(), userSpec.getPolicyName(), pvName, true, configService, ArchivePVAction.getFieldsAsPartOfStream(configService));
 				out.close();
 			}
 		} catch(Exception ex) { 

@@ -322,7 +322,13 @@ public class ArchiverValuesHandler implements XMLRPCStaxProcessor, EventStream, 
 					} else {
 						workingCopyOfEvent.put(lastName, currentValue);
 					}
-					lastName = null;
+					if(dbrType.isWaveForm()) {
+						if(lastTwoNodes.equals("array.data")) {
+							lastName = null;
+						}
+					} else {
+						lastName = null;
+					}
 				}
 			}
 		}
@@ -501,6 +507,7 @@ public class ArchiverValuesHandler implements XMLRPCStaxProcessor, EventStream, 
 	public RemotableEventStreamDesc getDescription() {
 		RemotableEventStreamDesc retVal = new RemotableEventStreamDesc(dbrType, this.pvName, yearOfCurrentEvent);
 		retVal.setSource(source);
+		retVal.setElementCount(elementCount);
 		addMappedHeader("units", "EGU", retVal);
 		addMappedHeader("prec", "PREC", retVal);
 		return retVal;

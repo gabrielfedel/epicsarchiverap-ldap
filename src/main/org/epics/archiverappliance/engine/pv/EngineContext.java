@@ -10,14 +10,13 @@
 
 package org.epics.archiverappliance.engine.pv;
 
-import gov.aps.jca.Channel;
-import gov.aps.jca.Context;
-
 import java.io.IOException;
 import java.sql.Timestamp;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
@@ -52,7 +51,12 @@ import org.epics.pvaccess.client.ChannelProviderRegistryFactory;
 import org.json.simple.JSONObject;
 import org.json.simple.JSONValue;
 
+import com.cosylab.epics.caj.CAJChannel;
+import com.cosylab.epics.caj.CAJContext;
 import com.google.common.eventbus.Subscribe;
+
+import gov.aps.jca.Channel;
+import gov.aps.jca.Context;
 /***
  * the context for the Archiver Engine
  * @author Luofeng Li
@@ -466,6 +470,16 @@ public class EngineContext {
 				} catch(Exception ex) {
 					logger.error("Exception beginnning archiving pv " + pvName, ex);
 				}
+			} else if(pubSubEvent.getType().equals("AbortComputeMetaInfo")) {
+				String pvName = pubSubEvent.getPvName();
+				try { 
+					logger.warn("AbortComputeMetaInfo called for " + pvName);
+					this.abortComputeMetaInfo(pvName);
+					// PubSubEvent confirmationEvent = new PubSubEvent("MetaInfoAborted", pubSubEvent.getSource() + "_" + ConfigService.WAR_FILE.MGMT, pvName);
+					// configService.getEventBus().post(confirmationEvent);
+				} catch(Exception ex) { 
+					logger.error("Exception aborting metainfo for PV " + pvName, ex);
+				}
 			}
 		} else {
 			logger.debug("Skipping processing event meant for " + pubSubEvent.getDestination());
@@ -746,5 +760,51 @@ public class EngineContext {
 	public ChannelProvider getChannelProvider() {
 		return channelProvider;
 	}
+	
+	public ScheduledThreadPoolExecutor getMiscTasksScheduler() {
+		return miscTasksScheduler;
+	}
+	
+	/**
+	 * Get the number of tasks pending in the main scheduler. 
+	 * This is the one that powers the write thread.
+	 * @return
+	 */
+	public int getMainSchedulerPendingTasks() {
+		if(scheduler != null) { 
+			return scheduler.getQueue().size();
+		} else {
+			return -1;
+		}
+	}
+	
+	
+	/**
+	 * Return some details on the CAJ contexts for the metrics page.
+	 * @return
+	 */
+	public List<Map<String, String>> getCAJContextDetails() {
+		List<Map<String, String>> ret = new LinkedList<Map<String, String>>();
 
+		int channelsWithPendingSearchRequests = 0;
+		int totalChannels = 0;
+
+		for(Context context : this.context2CommandThreadId) {
+			if(context instanceof CAJContext) {
+				CAJContext cajContext = (CAJContext) context;
+				for(Channel channel : cajContext.getChannels()) {
+					CAJChannel cajChannel = (CAJChannel) channel;
+					totalChannels++;
+					if(cajChannel.getTimerId() != null) channelsWithPendingSearchRequests++;
+				}
+			}
+		}
+
+		Map<String, String> obj = new LinkedHashMap<String, String>();
+		obj.put("name", "Channels with pending search requests");
+		obj.put("value", channelsWithPendingSearchRequests + " of " + totalChannels);
+		obj.put("source", "engine");
+		ret.add(obj);
+		return ret;
+	}
 }

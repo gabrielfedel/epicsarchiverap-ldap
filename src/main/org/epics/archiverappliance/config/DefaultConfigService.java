@@ -40,6 +40,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 import java.util.regex.Pattern;
 
 import javax.servlet.ServletContext;
@@ -189,6 +190,8 @@ public class DefaultConfigService implements ConfigService {
 
 
 	private ServletContext servletContext;
+	
+	private long appserverStartEpochSeconds = TimeUtils.getCurrentEpochSeconds();
 
 	protected DefaultConfigService() {
 		// Only the unit tests config service uses this constructor.
@@ -1994,4 +1997,47 @@ public class DefaultConfigService implements ConfigService {
 	public Set<String> getNamedFlagNames() {
 		return namedFlags.keySet();
 	}
+
+	@Override
+	public long getTimeOfAppserverStartup() {
+		return this.appserverStartEpochSeconds;
+	}
+
+	@Override
+	public void getAllExpandedNames(Consumer<String> func) {
+		Collection<String> allPVs = this.getAllPVs();
+		// Add fields and the VAL field
+		for(String pvName : allPVs) { 
+			func.accept(pvName);
+			if(!PVNames.isField(pvName)) { 
+				func.accept(pvName + ".VAL");
+				PVTypeInfo typeInfo = this.getTypeInfoForPV(pvName);
+				if(typeInfo != null) { 
+					for(String fieldName : typeInfo.getArchiveFields()) { 
+						func.accept(pvName + "." + fieldName);
+					}
+				}
+			}
+		}
+		List<String> allAliases = this.getAllAliases();
+		for(String pvName : allAliases) { 
+			func.accept(pvName);
+			if(!PVNames.isField(pvName)) { 
+				func.accept(pvName + ".VAL");
+				PVTypeInfo typeInfo = this.getTypeInfoForPV(pvName);
+				if(typeInfo != null) { 
+					for(String fieldName : typeInfo.getArchiveFields()) { 
+						func.accept(pvName + "." + fieldName);
+					}
+				}
+			}
+		}
+		for(String pvName : this.getArchiveRequestsCurrentlyInWorkflow()) { 
+			func.accept(pvName);
+			if(!PVNames.isField(pvName)) { 
+				func.accept(pvName + ".VAL");
+			}
+		}
+	}
+	
 }
