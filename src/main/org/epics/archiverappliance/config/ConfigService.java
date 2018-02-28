@@ -9,11 +9,13 @@ package org.epics.archiverappliance.config;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
+import java.util.function.Consumer;
 
 import javax.servlet.ServletContext;
 
@@ -152,6 +154,12 @@ public interface ConfigService {
 	public boolean isStartupComplete();
 	
 	/**
+	 * Get an approximate time in epoch seconds when the appserver started up.
+	 * @return The time this app server started up.
+	 */
+	public long getTimeOfAppserverStartup();
+	
+	/**
 	 * The name/path of the archappl.properties file.
 	 * By default, we look for archappl.properties in the webapp's classpath - this will typically resolve into WEB-INF/classes of the webapp.
 	 * However, you can override this using an environment variable (or java system property) of the same name.
@@ -195,7 +203,16 @@ public interface ConfigService {
 	 * Much goodness is facilitated if the objects are returned in the same order (perhaps order of creation) all the time.
 	 * @return String AllPVs &emsp;
 	 */
-	public Iterable<String> getAllPVs();
+	public Collection<String> getAllPVs();
+	
+	
+	/**
+	 * For automated PV submission, IOC engineers could add .VAL, fields, aliases etc.
+	 * This method attempts to return all possible PV's that the archiver could know about.
+	 * This is a lot of names; so we take in a consumer that potentially streams a name out as quickly as possible.
+	 * @param func A consumer of pvNames
+	 */
+	public void getAllExpandedNames(Consumer<String> func);
 	
 	/**
 	 * Given a PV, get us the appliance that is responsible for archiving it.

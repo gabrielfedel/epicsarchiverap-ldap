@@ -22,7 +22,6 @@ import org.epics.archiverappliance.common.BasicDispatcher;
 import org.epics.archiverappliance.common.GetVersion;
 import org.epics.archiverappliance.common.ProcessMetricsReport;
 import org.epics.archiverappliance.config.ConfigService;
-import org.epics.archiverappliance.engine.bpl.AbortArchiveRequestForAppliance;
 import org.epics.archiverappliance.engine.bpl.ArchiveChannelObjectDetailsAction;
 import org.epics.archiverappliance.engine.bpl.ChangeArchivalParamsAction;
 import org.epics.archiverappliance.engine.bpl.CleanUpAnyImmortalChannels;
@@ -42,12 +41,11 @@ import org.epics.archiverappliance.engine.bpl.reports.DroppedEventsTimestampRepo
 import org.epics.archiverappliance.engine.bpl.reports.DroppedEventsTypeChangeReport;
 import org.epics.archiverappliance.engine.bpl.reports.EventRateReport;
 import org.epics.archiverappliance.engine.bpl.reports.InstanceReportDetails;
+import org.epics.archiverappliance.engine.bpl.reports.LastKnownTimeStampReport;
 import org.epics.archiverappliance.engine.bpl.reports.ListAllChannels;
 import org.epics.archiverappliance.engine.bpl.reports.LostConnectionsReport;
-import org.epics.archiverappliance.engine.bpl.reports.NeverConnectedPVsAction;
+import org.epics.archiverappliance.engine.bpl.reports.MetaGetsForThisApplianceAction;
 import org.epics.archiverappliance.engine.bpl.reports.PVDetails;
-import org.epics.archiverappliance.engine.bpl.reports.ScanCopyTimeReport;
-import org.epics.archiverappliance.engine.bpl.reports.ScanMaxTimeReport;
 import org.epics.archiverappliance.engine.bpl.reports.SilentPVReport;
 import org.epics.archiverappliance.engine.bpl.reports.StorageRateReport;
 import org.epics.archiverappliance.engine.bpl.reports.WaveformPVsAction;
@@ -65,7 +63,7 @@ public class BPLServlet extends HttpServlet {
 		getActions.put("/getData.raw", GetEngineDataAction.class);
 		getActions.put("/getMetadata", GetLatestMetaDataAction.class);
 		getActions.put("/status", PVStatusAction.class);
-		getActions.put("/getNeverConnectedPVsForThisAppliance", NeverConnectedPVsAction.class);
+		getActions.put("/getMetaGetsForThisAppliance", MetaGetsForThisApplianceAction.class);
 		getActions.put("/getCurrentlyDisconnectedPVsForThisAppliance", CurrentlyDisconnectedPVsAction.class);
 		getActions.put("/getEventRateReport", EventRateReport.class);
 		getActions.put("/getStorageRateReport", StorageRateReport.class);
@@ -86,13 +84,11 @@ public class BPLServlet extends HttpServlet {
 		getActions.put("/listAllChannels", ListAllChannels.class);
 		getActions.put("/getProcessMetrics", ProcessMetricsReport.class);
 		getActions.put("/pausePVsonShutdown", PausePVsOnShutdown.class);
-		getActions.put("/abortArchivingPVForThisAppliance", AbortArchiveRequestForAppliance.class);
 		getActions.put("/cleanUpAnyImmortalChannels", CleanUpAnyImmortalChannels.class);
 		getActions.put("/getVersion", GetVersion.class);
 		getActions.put("/getArchivedWaveforms", WaveformPVsAction.class);
 		getActions.put("/getArchiveChannelObjectDetails", ArchiveChannelObjectDetailsAction.class);
-		getActions.put("/getPVsByScanCopyTime", ScanCopyTimeReport.class);
-		getActions.put("/getPVsByMaxTimeBetweenScans", ScanMaxTimeReport.class);
+		getActions.put("/getLastKnownTimeStampReport", LastKnownTimeStampReport.class);
 		
 	}
 

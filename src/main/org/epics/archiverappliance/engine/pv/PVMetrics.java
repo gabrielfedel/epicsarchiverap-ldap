@@ -44,14 +44,18 @@ public class PVMetrics {
 	private String controlPVname;
 	/**the status of archiving*/
 	private boolean isArchving = false;
-	/**the archive dbr type of this pv*/
+	/** The dbr type of this pv. This is what we used when initializing the PV */
 	private ArchDBRTypes archDBRTypes = null;
+	/** If we are dropping samples from type changes; this should reflect the new DBR type from the control system */
+	private ArchDBRTypes newCADBRType = null;
 	/**the element count of this pv's value*/
 	private int elementCount = 0;
 	/**is this pv archived in monitor mode?*/
 	private boolean isMonitor = false;
 	/**the sample period*/
 	private double samplingPeriod = 0;
+	/** The scan sampling period; including the jitter factor */
+	private long scanPeriodMillis = 0;
 	/**is this pv connected?*/
 	private boolean isConnected = false;
 	/**the time of last event and it is the the number of seconds since 1970/01/01*/
@@ -92,15 +96,6 @@ public class PVMetrics {
 
 	/**how many events were dropped because of the over flow of sample buffer?*/
 	private long sampleBufferFullLostEventCount = 0;
-	
-	/** SCAN related information - this is the number of events/samples we got from the PV. The SCAN thread will not pick all of these up.  */
-	private long scanEventCount = 0;
-	/** The time we took to copy the event from the PV into the buffers. This is the total; divide by the number of events to get the average */
-	private long scanProcessingTime = 0;
-	/** When did the previous SCAN copy start? */
-	private long previousScanStart = 0;
-	/** What's the maximum time we've waited for the SCAN thread to come in and copy values */
-	private long maxTimeBetweenScans = 0;
 	
 	/**
 	 * how many events were dropped because of the incorrect DBR type
@@ -167,8 +162,9 @@ public class PVMetrics {
 		sampleBufferFullLostEventCount++;
 	}
 	
-	public void incrementInvalidTypeLostEventCount() {
+	public void incrementInvalidTypeLostEventCount(ArchDBRTypes newCADBRType) {
 		invalidTypeLostEventCount++;
+		this.newCADBRType = newCADBRType;
 	}
 	
 	/**
@@ -295,6 +291,7 @@ public class PVMetrics {
 		this.pvName = pvName;
 		this.lastStartEpochSeconds = startEpochSeconds;
 		this.archDBRTypes = dbrTypes;
+		this.newCADBRType = this.archDBRTypes;
 		this.initialEpochSeconds=System.currentTimeMillis()/1000;
 	}
 
@@ -474,15 +471,6 @@ public class PVMetrics {
 		this.connectionLossRegainCount = connectionLossRegainCount;
 	}
 
-	public long getScanEventCount() {
-		return scanEventCount;
-	}
-	
-	public void incrementScanEventCount() {
-		scanEventCount++;
-	}
-
-  
 	private static void addDetailedStatus(LinkedList<Map<String, String>> statuses, String name, String value) {
 		Map<String, String> obj = new LinkedHashMap<String, String>();
 		obj.put("name", name);
@@ -502,10 +490,12 @@ public class PVMetrics {
 		addDetailedStatus(statuses, "Host name", hostName==null?"":hostName);
 		addDetailedStatus(statuses, "Controlling PV", controlPVname == null ? "" : controlPVname);
 		addDetailedStatus(statuses, "Is engine currently archiving this?",this.isArchving ? "yes" : "no");
-		addDetailedStatus(statuses, "Archiver DBR type (from CA)", this.archDBRTypes == null ? "Unkown" : this.archDBRTypes.toString());
+		addDetailedStatus(statuses, "Archiver DBR type (initial)", this.archDBRTypes == null ? "Unkown" : this.archDBRTypes.toString());
+		addDetailedStatus(statuses, "Archiver DBR type (from CA)", this.newCADBRType == null ? "Unkown" : this.newCADBRType.toString());
 		addDetailedStatus(statuses, "Number of elements per event (from CA)", "" + this.elementCount);
 		addDetailedStatus(statuses, "Is engine using monitors?", this.isMonitor ? "yes" : "no");
-		addDetailedStatus(statuses, "What's the engine's sampling period?", ""+ this.samplingPeriod);
+		addDetailedStatus(statuses, "What's the engine's sampling period?", ""+ (float)this.samplingPeriod);
+		addDetailedStatus(statuses, "The SCAN period (ms) after applying the jitter factor", ""+ this.scanPeriodMillis);
 		addDetailedStatus(statuses, "Is this PV currently connected?", this.isConnected ? "yes" : "no");
 		addDetailedStatus(statuses, "Connection state at last connection changed event", this.lastConnectionEventState ? "Connected" : "Not connected");
 		addDetailedStatus(statuses, "When did we receive the last event?", TimeUtils.convertToHumanReadableString(this.secondsOfLastEvent));
@@ -533,13 +523,6 @@ public class PVMetrics {
 		addDetailedStatus(statuses, "Estimated storage rate (MB/day)", (estimatedStorageRateInBytesPerSec <= 0.0) ? "Not enough info" : twoSignificantDigits.format(estimatedStorageRateInMegaBytesPerDay));
 		double estimatedStorageRateInGigaBytesPerYear = this.getStorageRate() * 60 * 60 * 24 * 365 / (1024 * 1024 * 1024);
 		addDetailedStatus(statuses, "Estimated storage rate (GB/year)", (estimatedStorageRateInBytesPerSec <= 0.0) ? "Not enough info" : twoSignificantDigits.format(estimatedStorageRateInGigaBytesPerYear));
-		if(this.scanEventCount > 0) { 
-			addDetailedStatus(statuses, "SCAN events from the PV", Long.toString(this.scanEventCount));
-			addDetailedStatus(statuses, "Average time for copy data into the buffer (ms)", twoSignificantDigits.format((double)this.scanProcessingTime/this.eventCounts));
-			addDetailedStatus(statuses, "The time the SCAN thread kicked in last", TimeUtils.convertToHumanReadableString(this.previousScanStart/1000));
-			addDetailedStatus(statuses, "Maximum time between the SCAN's (ms)", Long.toString(this.maxTimeBetweenScans));
-		}
-
 		return statuses;
 	}
 
@@ -569,6 +552,13 @@ public class PVMetrics {
 		return TimeUtils.convertToHumanReadableString(lastEventFromIOCTimeStamp);
 	}
 
+	public long getLastEventFromIOCTimeStamp() {
+		if(lastEventFromIOCTimeStamp != null) {
+			return TimeUtils.convertToEpochSeconds(lastEventFromIOCTimeStamp);
+		} else { 
+			return -1;
+		}
+	}
 
 
 	public void setLastEventFromIOCTimeStamp(Timestamp lastEventFromIOCTimeStamp) {
@@ -620,30 +610,12 @@ public class PVMetrics {
 			}
 		}
 	}
-	
-	
-	/** Various metrics about SCAN sampling for this PV. 
-	 * @param start  &emsp;
-	 * @param end  &emsp;
-	 * @param scan_period  &emsp;
-	 */
-	public void setScanProcessingTime(long start, long end, double scan_period) {
-		this.scanProcessingTime += (end - start);
-		if(this.previousScanStart != 0) { 
-			long timeBetweenScans = start - previousScanStart;
-			if(timeBetweenScans > this.maxTimeBetweenScans) { 
-				this.maxTimeBetweenScans = timeBetweenScans;
-			}
-		}
-		this.previousScanStart = start;
+
+	public long getScanPeriodMillis() {
+		return scanPeriodMillis;
 	}
 
-	public long getScanProcessingTime() {
-		return scanProcessingTime;
-	}
-
-	public long getMaxTimeBetweenScans() {
-		return maxTimeBetweenScans;
-	}
-	
+	public void setScanPeriodMillis(long scanPeriodMillis) {
+		this.scanPeriodMillis = scanPeriodMillis;
+	}	
 }
