@@ -18,6 +18,7 @@ import org.json.simple.JSONValue;
 public class LoginUser implements BPLAction {
 
 	private static final Logger logger = Logger.getLogger(LoginUser.class);
+        private static final String ADMIN_GROUP = "archiver-admins";
 
 	@Override
 	public void execute(HttpServletRequest req, HttpServletResponse resp, ConfigService configService)
@@ -39,13 +40,22 @@ public class LoginUser implements BPLAction {
 
 				req.login(req.getParameter("username"), req.getParameter("password"));
 
-				logger.info("Login successful!");
+				if (!req.isUserInRole (ADMIN_GROUP)) {
 
-				session.setAttribute("username", req.getParameter("username"));
+					logger.info("User is not in " + ADMIN_GROUP + " group.");
+					infoValues.put("validate", "forbidden");
 
-				logger.info("Username " + (String) session.getAttribute("username") + " signed in...");
+					req.logout ();
+				}
+				else {
+					logger.info("Login successful!");
 
-				infoValues.put("validate", "authenticated");
+					session.setAttribute("username", req.getParameter("username"));
+
+					logger.info("Username " + (String) session.getAttribute("username") + " signed in...");
+
+					infoValues.put("validate", "authenticated");
+				}
 			}
 			catch (ServletException  e) {
 

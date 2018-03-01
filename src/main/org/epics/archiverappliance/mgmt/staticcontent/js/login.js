@@ -9,6 +9,8 @@ function attemptSignUser(e) {
                 success: function(data, textStatus, jqXHR) {
 			if (data.validate == "authenticated")
 				window.location = e.data.redirectURL;
+			else if (data.validate == "forbidden" ) 
+				alert("User does not have enough privileges to edit the archiver parameters.");
 			else alert("Failed to sign user: " + data.error)
                         
                 },
