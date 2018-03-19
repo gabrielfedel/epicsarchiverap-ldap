@@ -27,6 +27,11 @@ public class ScannedArchiveChannel extends ArchiveChannel implements Runnable {
 	private static final Logger logger = Logger.getLogger(ScannedArchiveChannel.class);
 	/** Scan period in seconds */
 	final private double scan_period;
+	private long scanPeriodMillis;
+	/**
+	 * Stores the server time when we skip recording values; if the value has not changed when the SCAN comes calling; we record the event.
+	 */
+	private long serverTimeForStragglingScanValuesMillis = -1;
 
 	/** @see ArchiveChannel#ArchiveChannel
 	 * @param name pv's name
@@ -54,6 +59,9 @@ public class ScannedArchiveChannel extends ArchiveChannel implements Runnable {
 		this.pvMetrics.setSamplingPeriod(scan_period);
 		// this.max_repeats = max_repeats;
 		this.pvMetrics.setMonitor(false);
+		double scanJitterFactor = Double.parseDouble((String) configservice.getInstallationProperties().getOrDefault("org.epics.archiverappliance.engine.epics.scanJitterFactor", "0.95"));
+		this.scanPeriodMillis = (long) ((scan_period * scanJitterFactor) * 1000);
+		this.pvMetrics.setScanPeriodMillis(scanPeriodMillis);
 	}
 
 	/** @return Scan period in seconds */
@@ -68,53 +76,126 @@ public class ScannedArchiveChannel extends ArchiveChannel implements Runnable {
 
 	// Just for debugging...
 	@Override
-	protected boolean handleNewValue(final DBRTimeEvent timeevent)
-			throws Exception {
-		final boolean written = super.handleNewValue(timeevent);
-		this.getPVMetrics().incrementScanEventCount();
-		return written;
-	}
+	protected boolean handleNewValue(final DBRTimeEvent timeevent) throws Exception {
+		synchronized(this) { 
+			this.serverTimeForStragglingScanValuesMillis = -1;
+			try {
+				if (super.handleNewValue(timeevent)) {
+					return true;
+				}
+			} catch (Exception e) {
+				logger.error("exception in handleNewValue for pv" + this.getName(), e);
+			}
+			
+			if (isEnabled()) {
+				try {
+					if (latestDBRTimeEvent == null) {
+						return true;
+					}
+					// Is it a new value?
+					if (isMatchingTimeStamp(lastDBRTimeEvent, latestDBRTimeEvent)) {
+						return true;
+					}
 
-	/**
-	 * Invoked by periodic scanner. Try to add the most recent value to the
-	 * archive. Skip repeated values, unless we exceed the max. repeat count.
+					if(isLessThanScanPeriod(lastDBRTimeEvent, latestDBRTimeEvent)) { 
+						// logger.debug("Latest event is less than scan periond; skipping for " + this.getName());
+						// We however keep track of the server time when we got a handle event for comparision in the SCAN thread.
+						this.serverTimeForStragglingScanValuesMillis = System.currentTimeMillis();
+						return true;
+					} else { 
+						// logger.debug("Latest event is more than scan periond; recording for " + this.getName());
+						addValueToBuffer(latestDBRTimeEvent);
+					}
+					
+				} catch (Exception e) {
+					logger.error("exception in handleNewValue for pv " + this.getName(), e);
+				}
+				return true;
+			}
+			return false;
+		}
+	}
+	
+	/* (non-Javadoc)
+	 * @see java.lang.Runnable#run()
+	 * Called from the SCAN thread...
 	 */
 	@Override
-	final public void run() {
+	public void run() {
+		synchronized(this) { 
+			if (isEnabled()) {
+				try {
+					if (latestDBRTimeEvent == null || this.serverTimeForStragglingScanValuesMillis <= 0) {
+						// logger.debug("Latest event/straggling time is null " + this.getName());
+						return;
+					}
+					// Is it a new value?
+					if (isMatchingTimeStamp(lastDBRTimeEvent, latestDBRTimeEvent)) {
+						// logger.debug("Latest event is same as previous ebent " + this.getName());
+						return;
+					}
 
-		if (!isEnabled())
-			return;
-		try {
-			long start = System.currentTimeMillis();
-			synchronized (this) { // Have anything?
-				if (latestDBRTimeEvent == null) {
-					return;
+					if(isLessThanScanPeriod(this.serverTimeForStragglingScanValuesMillis, System.currentTimeMillis())) { 
+						// logger.debug("Latest event is less than scan period; skipping for " + this.getName());
+						return;
+					} else { 
+						// logger.debug("Latest event is more than scan period; recording for " + this.getName());
+						addValueToBuffer(latestDBRTimeEvent);
+					}
+
+				} catch (Exception e) {
+					logger.error("exception in handleNewValue for pv " + this.getName(), e);
 				}
-				// Is it a new value?
-				if (isMatchingTimeStamp(lastDBRTimeEvent, latestDBRTimeEvent)) {
-					logger.debug("Skipping events that have the same timestamp");
-					return;
-				}
+				return;
 			}
-			addValueToBuffer(latestDBRTimeEvent);
-			long end = System.currentTimeMillis();
-			this.getPVMetrics().setScanProcessingTime(start, end, scan_period);
-		} catch (Exception e) {
-			logger.error("exception duing run for pv " + this.getName(), e);
+			return;
 		}
 	}
 
-/**
- * check whether the two timeevent have the same time stamp
- * @param tempEvent1 time event 1
- * @param tempEvent2  time event 2
- * @return true if they have the same time stamps. Other wise ,false
- */
+
+	/**
+	 * check whether the two timeevent have the same time stamp
+	 * @param tempEvent1 time event 1
+	 * @param tempEvent2  time event 2
+	 * @return true if they have the same time stamps. Other wise ,false
+	 */
 	private boolean isMatchingTimeStamp(final DBRTimeEvent tempEvent1, final DBRTimeEvent tempEvent2) {
 		if(tempEvent1 != null && tempEvent2 != null && tempEvent1.getEventTimeStamp() != null && tempEvent2.getEventTimeStamp() != null) { 
 			Timestamp time1 = tempEvent1.getEventTimeStamp();
 			Timestamp time2 = tempEvent2.getEventTimeStamp();
 			return time1.equals(time2);
+		} else { 
+			return false;
+		}
+	}
+	
+	/**
+	 * Return true if the second event is within scanPeriodInMillis of the first event.
+	 * @param tempEvent1
+	 * @param tempEvent2
+	 * @return
+	 */
+	private boolean isLessThanScanPeriod(final DBRTimeEvent tempEvent1, final DBRTimeEvent tempEvent2) { 
+		if(tempEvent1 != null && tempEvent2 != null && tempEvent1.getEventTimeStamp() != null && tempEvent2.getEventTimeStamp() != null) { 
+			Timestamp time1 = tempEvent1.getEventTimeStamp();
+			Timestamp time2 = tempEvent2.getEventTimeStamp();
+			// logger.debug("Diff = " + (time2.getTime() - time1.getTime()) + " and scanPeriodMillis " + scanPeriodMillis);
+			return (time2.getTime() - time1.getTime()) < this.scanPeriodMillis;
+		} else { 
+			return false;
+		}
+	}
+	
+	/**
+	 * Return true if the second event is within scanPeriodInMillis of the first event.
+	 * @param tempEvent1
+	 * @param tempEvent2
+	 * @return
+	 */
+	private boolean isLessThanScanPeriod(long ts1, long ts2) {
+		if(ts1 != -1 && ts2 != -1) { 
+			// logger.debug("Diff = " + (ts1 - ts2) + " and scanPeriodMillis " + scanPeriodMillis);
+			return (ts2 - ts1) < this.scanPeriodMillis;
 		} else { 
 			return false;
 		}

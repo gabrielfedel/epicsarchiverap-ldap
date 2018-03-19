@@ -261,7 +261,11 @@ public class AppendDataStateData {
 		if(!info.getPVName().equals(pvName)) throw new IOException("Trying to append data for " + pvName + " to a file " + pvPath + " that has data for " + info.getPVName());
 		this.previousYear = info.getDataYear();
 		this.previousEpochSeconds = info.getLastEventEpochSeconds();
-		if(info.getLastEvent() != null) this.lastKnownTimeStamp = info.getLastEvent().getEventTimeStamp();
+		if(info.getLastEvent() != null) { 
+			this.lastKnownTimeStamp = info.getLastEvent().getEventTimeStamp();
+		} else { 
+			logger.error("Cannot determine last known timestamp when updating state for PV " + pvName + " and path " + pvPath.toString());
+		}
 		this.os = new BufferedOutputStream(Files.newOutputStream(pvPath, StandardOpenOption.CREATE, StandardOpenOption.APPEND));
 		this.previousFileName = pvPath.getFileName().toString();
 	}
@@ -307,7 +311,7 @@ public class AppendDataStateData {
 	public boolean bulkAppend(String pvName, ETLContext context, ETLBulkStream bulkStream, String extension, String extensionToCopyFrom) throws IOException {
 		Event firstEvent = bulkStream.getFirstEvent(context);
 		if(this.shouldISkipEventBasedOnTimeStamps(firstEvent)) {
-			logger.debug("The bulk append functionality works only if we the first event fits cleanly in the current stream.");
+			logger.error("The bulk append functionality works only if we the first event fits cleanly in the current stream for pv " + pvName + " for stream " + bulkStream.getDescription().getSource());
 			return false;
 		}
 		

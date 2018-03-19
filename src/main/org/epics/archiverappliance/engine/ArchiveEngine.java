@@ -472,8 +472,8 @@ public class ArchiveEngine {
 					// do nothing
 				} else {
 					// different period
-					engineContext.getScheduler().remove((ScannedArchiveChannel) channel);
-					engineContext.getScheduler().purge();
+					engineContext.getScanScheduler().remove((ScannedArchiveChannel) channel);
+					engineContext.getScanScheduler().purge();
 					// stop channel and remove id from ChannelList and buffer
 
 					channel.stop();
@@ -494,8 +494,8 @@ public class ArchiveEngine {
 				ArchiveEngine.archivePV(pvName, samplingPeriod, SamplingMethod.MONITOR, (int) engineContext.getWritePeriod(), writer, configservice, pvMetrics.getArchDBRTypes(), null, usePVAccess, useDBEPropeties);
 			} else {
 				// mode is changed from scan to monitor ,new mode is monitor
-				engineContext.getScheduler().remove((ScannedArchiveChannel) channel);
-				engineContext.getScheduler().purge();
+				engineContext.getScanScheduler().remove((ScannedArchiveChannel) channel);
+				engineContext.getScanScheduler().purge();
 				channel.stop();
 				engineContext.getWriteThead().removeChannel(pvName);
 				engineContext.getChannelList().remove(pvName);
@@ -533,8 +533,8 @@ public class ArchiveEngine {
 		} else {
 			// pv is in scan mode
 			// remove the channel in scan mode
-			engineContext.getScheduler().remove((ScannedArchiveChannel) channel);
-			engineContext.getScheduler().purge();
+			engineContext.getScanScheduler().remove((ScannedArchiveChannel) channel);
+			engineContext.getScanScheduler().purge();
 			channel.stop();
 			engineContext.getWriteThead().removeChannel(pvName);
 			engineContext.getChannelList().remove(pvName);

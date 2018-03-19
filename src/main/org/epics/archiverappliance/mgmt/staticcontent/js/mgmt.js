@@ -348,7 +348,8 @@ function getNeverConnectedPVsReport() {
 	createReportTable(jsonurl, tabledivname, 
 			[
 			 {'srcAttr' : 'pvName', 'label' : 'PV Name'}, 
-			 {'srcAttr' : 'requestTime', 'label' : 'Time request was made'},
+			 {'srcAttr' : 'requestTime', 'label' : 'Time metainfo request was made'},
+			 {'srcAttr' : 'startOfWorkflow', 'label' : 'Time we started the workflow'}, 
 			 {'srcAttr' : 'currentState', 'label' : 'Current workflow state'},
 			 {'srcAttr' : 'appliance', 'label' : 'Appliance'},
 			 {'srcAttr' : 'pvName', 'sortType' : 'none', 'label' : 'Abort request', 'srcFunction' : function(dataobject) { return '<a onclick="abortArchiveRequest(' + "'" + dataobject.pvName + "'" + ')" ><img class="imgintable" src="comm/img/edit-delete.png"></a>'; }}
@@ -365,6 +366,25 @@ function getNeverConnectedPVsReport() {
 	});
 }
 
+// Display details for PV's that are in the waiting metainfo.
+function getMetaGetsReport() {
+	var jsonurl = '../bpl/getMetaGets';
+	var tabledivname = 'reporttablediv';
+	createReportTable(jsonurl, tabledivname, 
+			[{'srcAttr' : 'pvName', 'label' : 'PV Name'} , 
+			 {'srcAttr' : 'isScheduled', 'label' : 'Monitoring started?'},
+			 {'srcAttr' : 'appliance', 'label' : 'Appliance'},
+			 {'srcAttr' : 'scheduleStart', 'label' : 'When?'},
+			 {'srcAttr' : 'timerRemaining', 'label' : 'Remaining'},
+			 {'srcAttr' : 'timerDone', 'label' : 'Timer Done'},
+			 {'srcAttr' : 'usePVAccess', 'label' : 'Using pvAccess'},
+			 {'srcAttr' : 'eventsSoFar', 'label' : 'Events so far'},
+			 {'srcAttr' : 'storageSoFar', 'label' : 'Storage so far'},
+			 {'srcAttr' : 'internalState', 'label' : 'Internal State'},			 
+			 {'srcAttr' : 'mainMeta', 'sortType' : 'none', 'label' : 'MainMeta'}		 
+			 ], 
+			 {'initialSort' : 1});
+}
 
 function abortArchiveRequest(pvName) { 
 	$.ajax({

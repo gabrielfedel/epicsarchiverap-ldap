@@ -5,11 +5,10 @@
  * EPICS archiver appliance is distributed subject to a Software License Agreement found
  * in file LICENSE that is included with this distribution.
  *******************************************************************************/
-package org.epics.archiverappliance.engine.bpl;
+package org.epics.archiverappliance.engine.bpl.reports;
 
 import java.io.IOException;
 import java.io.PrintWriter;
-import java.util.HashMap;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -17,34 +16,24 @@ import javax.servlet.http.HttpServletResponse;
 import org.apache.log4j.Logger;
 import org.epics.archiverappliance.common.BPLAction;
 import org.epics.archiverappliance.config.ConfigService;
+import org.epics.archiverappliance.engine.metadata.MetaGet;
 import org.epics.archiverappliance.utils.ui.MimeTypeConstants;
 import org.json.simple.JSONValue;
 
 /**
- * Abort any pending requests for archiving this PV in this appliance.
+ * Reports for PVs that never connected.
  * @author mshankar
  *
  */
-public class AbortArchiveRequestForAppliance implements BPLAction {
-	private static final Logger logger = Logger.getLogger(AbortArchiveRequestForAppliance.class);
-
+public class MetaGetsForThisApplianceAction implements BPLAction {
+	private static final Logger logger = Logger.getLogger(MetaGetsForThisApplianceAction.class);
 	@Override
-	public void execute(HttpServletRequest req, HttpServletResponse resp, ConfigService configService) throws IOException {
-		String pvName = req.getParameter("pv");
-		if(pvName == null || pvName.equals("")) {
-			resp.sendError(HttpServletResponse.SC_BAD_REQUEST);
-			return;
-		}
-		
-		logger.info("Aborting archiving requests in this appliance for the PV " + pvName);
-		HashMap<String, Object> infoValues = new HashMap<String, Object>();
+	public void execute(HttpServletRequest req, HttpServletResponse resp,
+			ConfigService configService) throws IOException {
+		logger.info("Getting the status of pvs that never connected since the start of this appliance");
 		resp.setContentType(MimeTypeConstants.APPLICATION_JSON);
 		try (PrintWriter out = resp.getWriter()) {
-			boolean abortedPVWorkflow = configService.getEngineContext().abortComputeMetaInfo(pvName);
-			infoValues.put("status", abortedPVWorkflow ? "ok" : "no");
-			infoValues.put("desc", "Aborted request for archiving PV " + pvName);
-			out.println(JSONValue.toJSONString(infoValues));
+			JSONValue.writeJSONString(MetaGet.getPendingMetaDetails(configService.getMyApplianceInfo().getIdentity()), out);
 		}
 	}
-
 }

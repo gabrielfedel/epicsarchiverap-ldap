@@ -1,12 +1,12 @@
 package org.epics.archiverappliance.engine.pv;
 
 import java.lang.reflect.Constructor;
-import java.util.Calendar;
 import java.util.HashMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 import org.apache.log4j.Logger;
+import org.epics.archiverappliance.common.TimeUtils;
 import org.epics.archiverappliance.config.ArchDBRTypes;
 import org.epics.archiverappliance.config.ConfigService;
 import org.epics.archiverappliance.config.MetaInfo;
@@ -102,7 +102,7 @@ public class EPICS_V4_PV implements PV, ChannelGetRequester, ChannelRequester, M
 	private ConcurrentHashMap<String, String> changedarchiveFieldsData = null;
 	
 	/**we save all meta field once every day and lastTimeStampWhenSavingarchiveFields is when we save all last meta fields*/
-	private Calendar lastTimeStampWhenSavingarchiveFields = null;
+	private long archiveFieldsSavedAtEpSec = 0;
 	
 	/**this pv is meta field  or not*/
 	private boolean isarchiveFieldsField = false;
@@ -303,9 +303,13 @@ public class EPICS_V4_PV implements PV, ChannelGetRequester, ChannelRequester, M
 				logger.debug("Type from structure in monitorConnect is " + structureID);
 				
 				Field valueField = structure.getField("value");
-				logger.debug("Value field in monitorConnect is of type " + valueField.getID());
+				if(valueField == null) { 
+					archDBRType = archDBRType.DBR_V4_GENERIC_BYTES;
+				} else {
+					logger.debug("Value field in monitorConnect is of type " + valueField.getID());					
+					archDBRType = this.determineDBRType(structureID, valueField.getID());
+				}
 				
-				archDBRType = this.determineDBRType(structureID, valueField.getID());
 				con = configservice.getArchiverTypeSystem().getV4Constructor(archDBRType);
 				logger.debug("Determined ArchDBRTypes for " + this.name + " as " + archDBRType);
 
@@ -370,16 +374,13 @@ public class EPICS_V4_PV implements PV, ChannelGetRequester, ChannelRequester, M
 						}
 						// //////////////////////////
 						// ////////////save all the fields once every day//////////////
-						if (this.lastTimeStampWhenSavingarchiveFields == null) {
+						if (this.archiveFieldsSavedAtEpSec <= 0) {
 							if (allarchiveFieldsData.size() != 0) {
 								saveMetaDataOnceEveryDay();
 							}
 						} else {
-							Calendar currentCalendar = Calendar.getInstance();
-							currentCalendar.add(Calendar.DAY_OF_MONTH, -1);
-							if (currentCalendar
-									.after(lastTimeStampWhenSavingarchiveFields)) {
-								// Calendar currentCalendar2=Calendar.getInstance();
+							long nowES = TimeUtils.getCurrentEpochSeconds();
+							if ((nowES - archiveFieldsSavedAtEpSec) >= 86400) {
 								saveMetaDataOnceEveryDay();
 							}
 						}
@@ -604,7 +605,7 @@ public class EPICS_V4_PV implements PV, ChannelGetRequester, ChannelRequester, M
 		}
 		// dbrtimeevent.s
 		dbrtimeevent.setFieldValues(tempHashMap, false);
-		lastTimeStampWhenSavingarchiveFields = Calendar.getInstance();
+		archiveFieldsSavedAtEpSec = TimeUtils.getCurrentEpochSeconds();
 	}
 
 	

@@ -9,7 +9,6 @@ package org.epics.archiverappliance.engine.pv;
 
 import java.lang.reflect.Constructor;
 import java.util.ArrayList;
-import java.util.Calendar;
 import java.util.HashMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -86,7 +85,7 @@ public class EPICS_V3_PV implements PV, ControllingPV, ConnectionListener, Monit
 	private ConcurrentHashMap<String, String> changedarchiveFieldsData = null;
 	
 	/**we save all meta field once every day and lastTimeStampWhenSavingarchiveFields is when we save all last meta fields*/
-	private Calendar lastTimeStampWhenSavingarchiveFields = null;
+	private long archiveFieldsSavedAtEpSec = 0;
 	
 	/**this pv is meta field  or not*/
 	private boolean isarchiveFieldsField = false;
@@ -679,7 +678,7 @@ public class EPICS_V3_PV implements PV, ControllingPV, ConnectionListener, Monit
 					assert(con != null);
 					if(generatedDBRType != archDBRType) { 
 						logger.warn("The type of PV " + this.name + " has changed from " + archDBRType + " to " + generatedDBRType);
-						fireDroppedSample(PVListener.DroppedReason.TYPE_CHANGE);
+						fireDroppedSampleTypeChange(generatedDBRType);
 						return;
 					}
 				}
@@ -707,16 +706,13 @@ public class EPICS_V3_PV implements PV, ControllingPV, ConnectionListener, Monit
 				}
 				// //////////////////////////
 				// ////////////save all the fields once every day//////////////
-				if (this.lastTimeStampWhenSavingarchiveFields == null) {
+				if (this.archiveFieldsSavedAtEpSec <= 0) {
 					if (allarchiveFieldsData.size() != 0) {
 						saveMetaDataOnceEveryDay();
 					}
 				} else {
-					Calendar currentCalendar = Calendar.getInstance();
-					currentCalendar.add(Calendar.DAY_OF_MONTH, -1);
-					if (currentCalendar
-							.after(lastTimeStampWhenSavingarchiveFields)) {
-						// Calendar currentCalendar2=Calendar.getInstance();
+					long nowES = TimeUtils.getCurrentEpochSeconds();
+					if ((nowES - archiveFieldsSavedAtEpSec) >= 86400) {
 						saveMetaDataOnceEveryDay();
 					}
 				}
@@ -750,9 +746,9 @@ public class EPICS_V3_PV implements PV, ControllingPV, ConnectionListener, Monit
 		}
 	}
 	
-	private void fireDroppedSample(PVListener.DroppedReason reason) { 
+	private void fireDroppedSampleTypeChange(ArchDBRTypes newCAType) { 
 		for (final PVListener listener : listeners) {
-			listener.pvDroppedSample(this,  reason);
+			listener.sampleDroppedTypeChange(this,  newCAType);
 		}
 	}
 
@@ -853,7 +849,7 @@ public class EPICS_V3_PV implements PV, ControllingPV, ConnectionListener, Monit
 		}
 		// dbrtimeevent.s
 		dbrtimeevent.setFieldValues(tempHashMap, false);
-		lastTimeStampWhenSavingarchiveFields = Calendar.getInstance();
+		archiveFieldsSavedAtEpSec = TimeUtils.getCurrentEpochSeconds();
 	}
 
 	@Override
