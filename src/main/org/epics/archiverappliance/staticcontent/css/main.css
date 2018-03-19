@@ -81,4 +81,13 @@ ul.mainmenu li, ul.mainmenu li a, ul.mainmenu li a:visited {
 	font-size: medium;
 }
 
+div.warning {
 
+        position: relative;
+        background-color: rgba(255, 0, 0, 0.3);
+        width: 15%;
+        margin: 5px;
+        padding: 5px;
+        border-radius: 5px;
+        font-weight: bold;
+}
