@@ -15,6 +15,7 @@ import org.apache.log4j.Logger;
 import org.epics.archiverappliance.Event;
 import org.epics.archiverappliance.EventStream;
 import org.epics.archiverappliance.EventStreamDesc;
+import org.epics.archiverappliance.common.BasicContext;
 import org.epics.archiverappliance.common.TimeUtils;
 import org.epics.archiverappliance.retrieval.mimeresponses.ExceptionCommunicator;
 import org.epics.archiverappliance.retrieval.mimeresponses.MimeResponse;
@@ -69,8 +70,11 @@ class MergeDedupConsumer implements EventStreamConsumer, AutoCloseable {
 		}
 	}
 	
-	@Override
-	public void close() {
+	/**
+	 * Make sure we push any remaining events that are still pending in the consumer.
+	 * We do this when we close/switch to a new PV.
+	 */
+	private void pushRemainingEvents() {
 		if(!haveIpushedTheFirstEvent && firstEvent != null) {
 			try {
 				logger.debug("Pushing the first event as part of the close as it has not been sent yet.");
@@ -81,6 +85,11 @@ class MergeDedupConsumer implements EventStreamConsumer, AutoCloseable {
 				logger.error("Unable to even push the first event thru for pv " + pvName, ex);
 			}
 		}
+	}
+	
+	@Override
+	public void close() {
+		pushRemainingEvents();
 		logNumbersAndCollectTotal();
 		mimeresponse.close();
 		try { 
@@ -96,10 +105,11 @@ class MergeDedupConsumer implements EventStreamConsumer, AutoCloseable {
 		}
 	}
 	
-	public void processingPV(String PV, Timestamp start, Timestamp end, EventStreamDesc streamDesc) {
+	public void processingPV(BasicContext retrievalContext, String PV, Timestamp start, Timestamp end, EventStreamDesc streamDesc) {
+		pushRemainingEvents();
 		logNumbersAndCollectTotal();
 		this.startTimeStamp = start;
-		mimeresponse.processingPV(PV, start, end, streamDesc);
+		mimeresponse.processingPV(retrievalContext, PV, start, end, streamDesc);
 		pvName = PV;
 		resetForNextPV();
 	}
@@ -118,7 +128,7 @@ class MergeDedupConsumer implements EventStreamConsumer, AutoCloseable {
 					}
 					
 					if(!haveIpushedTheFirstEvent) { 
-						if(e.getEventTimeStamp().before(this.startTimeStamp)) {
+						if(e.getEventTimeStamp().before(this.startTimeStamp) || e.getEventTimeStamp().equals(this.startTimeStamp)) {
 							logger.debug("Making a copy of another event " + TimeUtils.convertToHumanReadableString(e.getEventTimeStamp()));
 							firstEvent = e.makeClone();
 							continue;

@@ -6,6 +6,7 @@ import java.io.PrintWriter;
 import java.net.URLEncoder;
 import java.sql.Timestamp;
 import java.util.LinkedList;
+import java.util.List;
 
 import org.apache.log4j.Logger;
 import org.epics.archiverappliance.common.TimeUtils;
@@ -30,12 +31,13 @@ import org.epics.archiverappliance.utils.ui.JSONEncoder;
  */
 public class ArchivePVState {
 	private static Logger logger = Logger.getLogger(ArchivePVState.class.getName());
-	public enum ArchivePVStateMachine { START, METAINFO_REQUESTED, METAINFO_OBTAINED, POLICY_COMPUTED, TYPEINFO_STABLE, ARCHIVE_REQUEST_SUBMITTED, ARCHIVING, ABORTED, FINISHED};
+	public enum ArchivePVStateMachine { START, METAINFO_REQUESTED, METAINFO_GATHERING, METAINFO_OBTAINED, POLICY_COMPUTED, TYPEINFO_STABLE, ARCHIVE_REQUEST_SUBMITTED, ARCHIVING, ABORTED, FINISHED}
 
 	private ArchivePVStateMachine currentState = ArchivePVStateMachine.START;
 	private String pvName;
 	private String abortReason = "";
 	private ConfigService configService;
+	private List<String> fieldsArchivedAsPartOfStream;
 	private String applianceIdentityAfterCapacityPlanning;
 	private Timestamp startOfWorkflow = TimeUtils.now();
 	private Timestamp metaInfoRequestedSubmitted = null;
@@ -46,6 +48,12 @@ public class ArchivePVState {
 		this.pvName = pvName;
 		this.configService = configService;
 		this.myIdentity = this.configService.getMyApplianceInfo().getIdentity();
+		try {
+			this.fieldsArchivedAsPartOfStream = configService.getFieldsArchivedAsPartOfStream();
+		} catch(IOException ex) {
+			logger.error("Cannot determine fields that are to be archived as part of stream", ex);
+			this.fieldsArchivedAsPartOfStream = null;
+		}
 	}
 
 	public synchronized void nextStep() {
@@ -64,10 +72,15 @@ public class ArchivePVState {
 					JSONEncoder<UserSpecifiedSamplingParams> encoder = JSONEncoder.getEncoder(UserSpecifiedSamplingParams.class);
 					pubSubEvent.setEventData(encoder.encode(userSpec).toJSONString());
 					configService.getEventBus().post(pubSubEvent);
+					currentState = ArchivePVStateMachine.METAINFO_REQUESTED;
 					return;	
 				}
 				case METAINFO_REQUESTED: {
-					logger.debug("Metainfo has been requested for " + pvName);
+					logger.debug("A request to gather metainfo has been published for the PV " + pvName);
+					return;
+				}
+				case METAINFO_GATHERING: {
+					logger.debug("Metainfo has been requested and is being gathered for " + pvName);
 					return;
 				}
 				case METAINFO_OBTAINED: {
@@ -127,6 +140,27 @@ public class ArchivePVState {
 					typeInfo.setUsePVAccess(userSpec.isUsePVAccess());
 					typeInfo.setPolicyName(thePolicy.getPolicyName());
 					
+					if(!isField) {
+						for(String field : thePolicy.getArchiveFields()) {
+							if(fieldsArchivedAsPartOfStream != null && fieldsArchivedAsPartOfStream.contains(field)) {
+								typeInfo.addArchiveField(field);								
+							} else {
+								initiateWorkFlowForNonStreamField(PVNames.normalizePVNameWithField(pvName, field), userSpec); 
+							}
+						}
+
+						// Copy over any archive fields from the user spec
+						if(userSpec != null && userSpec.wereAnyFieldsSpecified()) {
+							for(String fieldName : userSpec.getArchiveFields()) {
+								if(fieldsArchivedAsPartOfStream != null && fieldsArchivedAsPartOfStream.contains(fieldName)) {
+									typeInfo.addArchiveField(fieldName);
+								} else {
+									initiateWorkFlowForNonStreamField(PVNames.normalizePVNameWithField(pvName, fieldName), userSpec); 
+								}
+							}
+						}
+					}
+
 					String aliasFieldName = "NAME";
 					if(typeInfo.hasExtraField(aliasFieldName)) {
 						if(userSpec.isSkipAliasCheck()) { 
@@ -152,20 +186,7 @@ public class ArchivePVState {
 							}
 						}
 					}
-					
-					if(!isField) {
-						for(String field : thePolicy.getArchiveFields()) {
-							typeInfo.addArchiveField(field);
-						}
-
-						// Copy over any archive fields from the user spec
-						if(userSpec != null && userSpec.wereAnyFieldsSpecified()) {
-							for(String fieldName : userSpec.getArchiveFields()) {
-								typeInfo.addArchiveField(fieldName);
-							}
-						}
-					}
-					
+										
 					ApplianceInfo applianceInfoForPV = null;
 					
 					if(userSpec.isSkipCapacityPlanning()) { 
@@ -255,7 +276,7 @@ public class ArchivePVState {
 	}
 
 	public boolean hasNotConnectedSoFar() {
-		return this.currentState.equals(ArchivePVState.ArchivePVStateMachine.START) || this.currentState.equals(ArchivePVState.ArchivePVStateMachine.METAINFO_REQUESTED) || this.currentState.equals(ArchivePVState.ArchivePVStateMachine.ABORTED);
+		return this.currentState.equals(ArchivePVState.ArchivePVStateMachine.START) || this.currentState.equals(ArchivePVState.ArchivePVStateMachine.METAINFO_REQUESTED) || this.currentState.equals(ArchivePVState.ArchivePVStateMachine.METAINFO_GATHERING) || this.currentState.equals(ArchivePVState.ArchivePVStateMachine.ABORTED);
 	}
 
 	/**
@@ -285,7 +306,7 @@ public class ArchivePVState {
 	
 	public void metaInfoRequestAcknowledged() { 
 		metaInfoRequestedSubmitted = TimeUtils.now();
-		this.currentState = ArchivePVStateMachine.METAINFO_REQUESTED;
+		this.currentState = ArchivePVStateMachine.METAINFO_GATHERING;
 	}
 	
 	public void metaInfoObtained(MetaInfo metaInfo) { 
@@ -383,6 +404,24 @@ public class ArchivePVState {
 			logger.error("Exception archiving alias " + realName + " in workflow for " + pvName, ex);
 		}
 	}
+	
+	/**
+	 * Add a request for a field that is not to be stored with the stream (aka .VAL).
+	 * This will convert the request to archive this field into a separate pvName.fieldName request after making the necessary checks.
+	 * @throws IOException 
+	 */
+	private void initiateWorkFlowForNonStreamField(String pvWithFieldName, UserSpecifiedSamplingParams userSpec) throws IOException {
+		logger.debug("Converting " + pvWithFieldName + " into a separate request separate from the main PV as it is not to be archived as part of the stream.");
+		if(PVNames.determineAppropriatePVTypeInfo(pvWithFieldName, configService) == null && !configService.doesPVHaveArchiveRequestInWorkflow(pvWithFieldName)) {
+			ByteArrayOutputStream bos = new ByteArrayOutputStream();
+			PrintWriter out = new PrintWriter(bos);
+			ArchivePVAction.archivePV(out, pvWithFieldName, userSpec.isUserOverrideParams(), userSpec.getUserSpecifedsamplingMethod(), userSpec.getUserSpecifedSamplingPeriod(), userSpec.getControllingPV(), userSpec.getPolicyName(), pvName, true, configService, ArchivePVAction.getFieldsAsPartOfStream(configService));
+			out.close();
+		} else {
+			logger.debug("Already have " + pvWithFieldName + " in typeinfo or in pending requests");
+		}
+	}
+	
 
 	/**
 	 * @return The current archiving state machine state

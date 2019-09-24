@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -65,6 +66,7 @@ import org.epics.archiverappliance.config.PVTypeInfo;
 import org.epics.archiverappliance.config.StoragePluginURLParser;
 import org.epics.archiverappliance.data.ScalarValue;
 import org.epics.archiverappliance.etl.ETLDest;
+import org.epics.archiverappliance.mgmt.bpl.PVsMatchingParameter;
 import org.epics.archiverappliance.mgmt.policy.PolicyConfig.SamplingMethod;
 import org.epics.archiverappliance.retrieval.mimeresponses.FlxXMLResponse;
 import org.epics.archiverappliance.retrieval.mimeresponses.JPlotResponse;
@@ -147,8 +149,38 @@ public class DataRetrievalServlet  extends HttpServlet {
 			resp.sendError(HttpServletResponse.SC_BAD_REQUEST, msg);
 		}
 		
-		return;
+		return;		
+	}
+	
+	@Override
+	protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
 		
+		String[] pathnameSplit = req.getPathInfo().split("/");
+		String requestName = (pathnameSplit[pathnameSplit.length - 1].split("\\."))[0];
+		
+		if (requestName.equals("getDataForPVs")) {
+			logger.info("User requesting data for multiple PVs");
+			doGetMultiPV(req, resp);
+		} else if (requestName.equals("getDataAtTime")) {
+			try {
+				GetDataAtTime.getDataAtTime(req, resp, configService);
+				return;
+			} catch(ExecutionException | InterruptedException ex) {
+				throw new IOException(ex);
+			}
+		} else if (requestName.equals("getDataAtTimeForAppliance")) {
+			try {
+				GetDataAtTime.getDataAtTimeForAppliance(req, resp, configService);
+				return;
+			} catch(ExecutionException | InterruptedException ex) {
+				throw new IOException(ex);
+			}
+		} else {
+			String msg = "\"" + requestName + "\" is not a valid API method.";
+			resp.setHeader(MimeResponse.ACCESS_CONTROL_ALLOW_ORIGIN, msg);
+			resp.sendError(HttpServletResponse.SC_BAD_REQUEST, msg);
+		}
+		return;
 	}
 	
 	private void doGetSinglePV(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
@@ -215,12 +247,6 @@ public class DataRetrievalServlet  extends HttpServlet {
 			return;
 		}
 		
-		if(pvName.endsWith(".VAL")) { 
-			int len = pvName.length();
-			pvName = pvName.substring(0, len-4);
-			logger.info("Removing .VAL from pvName for request giving " + pvName);
-		}
-
 		// ISO datetimes are of the form "2011-02-02T08:00:00.000Z"
 		Timestamp end = TimeUtils.plusHours(TimeUtils.now(), 1);
 		if(endTimeStr != null) {
@@ -309,13 +335,20 @@ public class DataRetrievalServlet  extends HttpServlet {
 		
 		PostProcessor postProcessor = PostProcessors.findPostProcessor(postProcessorUserArg);
 
-
+		String pvNameFromRequest = pvName;
+		
+		if(pvName.endsWith(".VAL")) { 
+			int len = pvName.length();
+			pvName = pvName.substring(0, len-4);
+			logger.info("Removing .VAL from pvName for request giving " + pvName);
+		}
+		
 		PVTypeInfo typeInfo  = PVNames.determineAppropriatePVTypeInfo(pvName, configService);
 		pmansProfiler.mark("After PVTypeInfo");
 		
 		if(typeInfo == null && RetrievalState.includeExternalServers(req)) {
 			logger.debug("Checking to see if pv " + pvName + " is served by a external Archiver Server");
-			typeInfo = checkIfPVisServedByExternalServer(pvName, start, req, resp, useChunkedEncoding);
+			typeInfo = checkIfPVisServedByExternalServer(pvName, start, end, req, resp, useChunkedEncoding);
 		}
 		
 		
@@ -353,7 +386,7 @@ public class DataRetrievalServlet  extends HttpServlet {
 				String defaultPPClassName = configService.getInstallationProperties().getProperty("org.epics.archiverappliance.retrieval.DefaultUseReducedPostProcessor", FirstSamplePP.class.getName());
 				logger.debug("Using the default usereduced preprocessor " + defaultPPClassName);
 				try {
-					postProcessor = (PostProcessor) Class.forName(defaultPPClassName).newInstance();
+					postProcessor = (PostProcessor) Class.forName(defaultPPClassName).getConstructor().newInstance();
 				} catch(Exception ex) {
 					logger.error("Exception constructing new instance of post processor " + defaultPPClassName, ex);
 					postProcessor = null;
@@ -381,8 +414,6 @@ public class DataRetrievalServlet  extends HttpServlet {
 
 		pmansProfiler.mark("After Appliance Info");
 		
-		String pvNameFromRequest = pvName;
-		
 		String fieldName = PVNames.getFieldName(pvName);
 		if(fieldName != null && !fieldName.equals("") && typeInfo.checkIfFieldAlreadySepcified(fieldName)) {
 			logger.debug("We reset the pvName " + pvName + " to one from the typeinfo " + typeInfo.getPvName() + " as that determines the name of the stream. Also using ExtraFieldsPostProcessor");
@@ -406,8 +437,8 @@ public class DataRetrievalServlet  extends HttpServlet {
 				RetrievalExecutorResult executorResult = determineExecutorForPostProcessing(pvName, typeInfo, requestTimes, req, postProcessor)
 				) {
 			HashMap<String, String> engineMetadata = null;
-			if(fetchLatestMetadata) { 
-				// Make a call to the engine to fetch the latest metadata.
+			if(fetchLatestMetadata  && typeInfo.getSamplingMethod() != SamplingMethod.DONT_ARCHIVE) { 
+				// Make a call to the engine to fetch the latest metadata; skip external servers, template PVs and the like by checking the sampling method.
 				engineMetadata = fetchLatestMedataFromEngine(pvName, applianceForPV);
 			}
 			
@@ -447,7 +478,7 @@ public class DataRetrievalServlet  extends HttpServlet {
 					if(currentlyProcessingPV == null || !currentlyProcessingPV.equals(pvName)) {
 						logger.debug("Switching to new PV " + pvName + " In some mime responses we insert special headers at the beginning of the response. Calling the hook for that");
 						currentlyProcessingPV = pvName;
-						mergeDedupCountingConsumer.processingPV(currentlyProcessingPV, start, end, (eventStream != null) ? sourceDesc : null);
+						mergeDedupCountingConsumer.processingPV(retrievalContext, currentlyProcessingPV, start, end, (eventStream != null) ? sourceDesc : null);
 					}
 
 
@@ -526,7 +557,12 @@ public class DataRetrievalServlet  extends HttpServlet {
 		
 		// Gets the list of PVs specified by the `pv` parameter
 		// String arrays might be inefficient for retrieval. In any case, they are sorted, which is essential later on.
-		List<String> pvNames = Arrays.asList(req.getParameterValues("pv"));
+		List<String> pvNames = null;
+		if(req.getMethod().equals("POST")) { 
+			pvNames = PVsMatchingParameter.getPVNamesFromPostBody(req, configService);
+		} else { 
+			pvNames = Arrays.asList(req.getParameterValues("pv"));
+		}
 	
 		// Ensuring that the AA has finished starting up before requests are accepted.
 		if(configService.getStartupState() != STARTUP_SEQUENCE.STARTUP_COMPLETE) { 
@@ -602,12 +638,6 @@ public class DataRetrievalServlet  extends HttpServlet {
 			return;
 		}
 		
-		for (String pvName : pvNames) if (pvName.endsWith(".VAL")) { 
-			int len = pvName.length();
-			pvName = pvName.substring(0, len-4);
-			logger.info("Removing .VAL from pvName for request giving " + pvName);
-		}
-
 		// ISO datetimes are of the form "2011-02-02T08:00:00.000Z"
 		Timestamp end = TimeUtils.plusHours(TimeUtils.now(), 1);
 		if(endTimeStr != null) {
@@ -708,6 +738,20 @@ public class DataRetrievalServlet  extends HttpServlet {
 			postProcessors.add(PostProcessors.findPostProcessor(postProcessorUserArg));
 		}
 		
+		List<String> pvNamesFromRequests = new ArrayList<String>(pvNames.size());
+		for (int i = 0; i < pvNames.size(); i++) {
+			String pvName = pvNames.get(i);
+			pvNamesFromRequests.add(pvName);
+		}
+		
+		for (int i = 0; i < pvNames.size(); i++) {
+			if (pvNames.get(i).endsWith(".VAL")) { 
+				int len = pvNames.get(i).length();
+				pvNames.set(i, pvNames.get(i).substring(0, len-4));
+				logger.info("Removing .VAL from pvName for request giving " + pvNames.get(i));
+			}
+		}
+		
 		List<PVTypeInfo> typeInfos  = new ArrayList<PVTypeInfo>(pvNames.size());
 		for (int i = 0; i < pvNames.size(); i++) {
 			typeInfos.add(PVNames.determineAppropriatePVTypeInfo(pvNames.get(i), configService));
@@ -717,17 +761,11 @@ public class DataRetrievalServlet  extends HttpServlet {
 		for (int i = 0; i < pvNames.size(); i++)
 			if(typeInfos.get(i) == null && RetrievalState.includeExternalServers(req)) {
 			logger.debug("Checking to see if pv " + pvNames.get(i) + " is served by a external Archiver Server");
-			typeInfos.set(i, checkIfPVisServedByExternalServer(pvNames.get(i), start, req, resp, useChunkedEncoding));
+			typeInfos.set(i, checkIfPVisServedByExternalServer(pvNames.get(i), start, end, req, resp, useChunkedEncoding));
 		}
 		
 		for (int i = 0; i < pvNames.size(); i++) {
 			if(typeInfos.get(i) == null) {
-				// TODO Only needed if we're forwarding the request to another server.
-				if(resp.isCommitted()) { 
-					logger.debug("Proxied the data thru an external server for PV " + pvNames.get(i));
-					return;
-				}
-				
 				if(retiredPVTemplate != null) {
 					PVTypeInfo templateTypeInfo = PVNames.determineAppropriatePVTypeInfo(retiredPVTemplate, configService);
 					if(templateTypeInfo != null) { 
@@ -757,7 +795,7 @@ public class DataRetrievalServlet  extends HttpServlet {
 									FirstSamplePP.class.getName());
 					logger.debug("Using the default usereduced preprocessor " + defaultPPClassName);
 					try {
-						postProcessors.set(i, (PostProcessor) Class.forName(defaultPPClassName).newInstance());
+						postProcessors.set(i, (PostProcessor) Class.forName(defaultPPClassName).getConstructor().newInstance());
 					} catch(Exception ex) {
 						logger.error("Exception constructing new instance of post processor " + defaultPPClassName, ex);
 						postProcessors.set(i, null);
@@ -824,10 +862,8 @@ public class DataRetrievalServlet  extends HttpServlet {
 		pmansProfiler.mark("After Appliance Info");
 		
 		// Setting post processor for PVs, taking into account whether there is a field in the PV name
-		List<String> pvNamesFromRequests = new ArrayList<String>(pvNames.size());
 		for (int i = 0; i < pvNames.size(); i++) {
 			String pvName = pvNames.get(i);
-			pvNamesFromRequests.add(pvName);
 			PVTypeInfo typeInfo = typeInfos.get(i);
 			postProcessorUserArg = postProcessorUserArgs.get(i);
 			
@@ -886,8 +922,8 @@ public class DataRetrievalServlet  extends HttpServlet {
 			List<BasicContext> retrievalContexts = new ArrayList<BasicContext>(pvNames.size());
 			List<RetrievalExecutorResult> executorResults = new ArrayList<RetrievalExecutorResult>(pvNames.size());
 			for (int i = 0; i < pvNames.size(); i++) {
-				if(fetchLatestMetadata) {
-					// Make a call to the engine to fetch the latest metadata.
+				if(fetchLatestMetadata && typeInfos.get(i).getSamplingMethod() != SamplingMethod.DONT_ARCHIVE) {
+					// Make a call to the engine to fetch the latest metadata; skip external servers, template PVs and the like by checking the sampling method.
 					engineMetadatas.add(fetchLatestMedataFromEngine(pvNames.get(i), applianceForPVs.get(i)));
 				}
 				retrievalContexts.add(new BasicContext(typeInfos.get(i).getDBRType(), pvNamesFromRequests.get(i)));
@@ -931,106 +967,108 @@ public class DataRetrievalServlet  extends HttpServlet {
 		 */
 		try {
 			for (int i = 0; i < pvNames.size(); i++) {
-				List<Future<EventStream>> eventStreamFutures = listOfEventStreamFuturesLists.get(i);
-				String pvName = pvNames.get(i);
-				PVTypeInfo typeInfo = typeInfos.get(i);
-				HashMap<String, String> engineMetadata = fetchLatestMetadata ? engineMetadatas.get(i) : null;
-				PostProcessor postProcessor = postProcessors.get(i);
-				
-				logger.debug("Done with the RetrievalResults; moving onto the individual event stream "
-						+ "from each source for " + StringUtils.join(pvNames, ", "));
-				pmansProfiler.mark("After retrieval results");
-				for(Future<EventStream> future : eventStreamFutures) {
-					EventStreamDesc sourceDesc = null;
-					
-					// Gets the result of a data retrieval
-					try (EventStream eventStream = future.get()) {
-						sourceDesc = null; // Reset it for each loop iteration.
-						sourceDesc = eventStream.getDescription();
-						if(sourceDesc == null) {
-							logger.warn("Skipping event stream without a desc for pv " + pvName);
-							continue;
-						}
-	
-						logger.debug("Processing event stream for pv " + pvName + " from source "
-								+ ((eventStream.getDescription() != null) ? eventStream.getDescription().getSource() : " unknown"));
-	
+				try(BasicContext retrievalContext = new BasicContext(typeInfos.get(i).getDBRType(), pvNamesFromRequests.get(i))) {
+					List<Future<EventStream>> eventStreamFutures = listOfEventStreamFuturesLists.get(i);
+					String pvName = pvNames.get(i);
+					PVTypeInfo typeInfo = typeInfos.get(i);
+					HashMap<String, String> engineMetadata = fetchLatestMetadata ? engineMetadatas.get(i) : null;
+					PostProcessor postProcessor = postProcessors.get(i);
 
-						try {
-							mergeTypeInfo(typeInfo, sourceDesc, engineMetadata);
-						} catch(MismatchedDBRTypeException mex) {
-							logger.error(mex.getMessage(), mex);
-							continue;
-						} 
-	
-						if(currentlyProcessingPV == null || !currentlyProcessingPV.equals(pvName)) {
-							logger.debug("Switching to new PV " + pvName + " In some mime responses we insert "
-									+ "special headers at the beginning of the response. Calling the hook for "
-									+ "that");
-							currentlyProcessingPV = pvName;
-							/*
-							 * Goes through the PB data stream over a period of time. The relevant MIME response
-							 * actually deal with the processing of the PV. `start` and `end` refer to the very
-							 * beginning and very end of the time period being retrieved over, regardless of
-							 * whether it is divided up or not.
-							 */
-							mergeDedupCountingConsumer.processingPV(currentlyProcessingPV, start, end, (eventStream != null) ? sourceDesc : null);
-						}
-	
-	
-						try {
-							// If the postProcessor does not have a consolidated event stream, we send each eventstream across as we encounter it.
-							// Else we send the consolidatedEventStream down below.
-							if(!(postProcessor instanceof PostProcessorWithConsolidatedEventStream)) {
-								/*
-								 * The eventStream object contains all the data over the current period.
-								 */
-								mergeDedupCountingConsumer.consumeEventStream(eventStream);
-								resp.flushBuffer();
+					logger.debug("Done with the RetrievalResults; moving onto the individual event stream "
+							+ "from each source for " + StringUtils.join(pvNames, ", "));
+					pmansProfiler.mark("After retrieval results");
+					for(Future<EventStream> future : eventStreamFutures) {
+						EventStreamDesc sourceDesc = null;
+
+						// Gets the result of a data retrieval
+						try (EventStream eventStream = future.get()) {
+							sourceDesc = null; // Reset it for each loop iteration.
+							sourceDesc = eventStream.getDescription();
+							if(sourceDesc == null) {
+								logger.warn("Skipping event stream without a desc for pv " + pvName);
+								continue;
 							}
+
+							logger.debug("Processing event stream for pv " + pvName + " from source "
+									+ ((eventStream.getDescription() != null) ? eventStream.getDescription().getSource() : " unknown"));
+
+
+							try {
+								mergeTypeInfo(typeInfo, sourceDesc, engineMetadata);
+							} catch(MismatchedDBRTypeException mex) {
+								logger.error(mex.getMessage(), mex);
+								continue;
+							} 
+
+							if(currentlyProcessingPV == null || !currentlyProcessingPV.equals(pvName)) {
+								logger.debug("Switching to new PV " + pvName + " In some mime responses we insert "
+										+ "special headers at the beginning of the response. Calling the hook for "
+										+ "that");
+								currentlyProcessingPV = pvName;
+								/*
+								 * Goes through the PB data stream over a period of time. The relevant MIME response
+								 * actually deal with the processing of the PV. `start` and `end` refer to the very
+								 * beginning and very end of the time period being retrieved over, regardless of
+								 * whether it is divided up or not.
+								 */
+								mergeDedupCountingConsumer.processingPV(retrievalContext, currentlyProcessingPV, start, end, (eventStream != null) ? sourceDesc : null);
+							}
+
+
+							try {
+								// If the postProcessor does not have a consolidated event stream, we send each eventstream across as we encounter it.
+								// Else we send the consolidatedEventStream down below.
+								if(!(postProcessor instanceof PostProcessorWithConsolidatedEventStream)) {
+									/*
+									 * The eventStream object contains all the data over the current period.
+									 */
+									mergeDedupCountingConsumer.consumeEventStream(eventStream);
+									resp.flushBuffer();
+								}
+							} catch(Exception ex) {
+								if(ex != null && ex.toString() != null && ex.toString().contains("ClientAbortException")) {
+									// We check for ClientAbortException etc this way to avoid including tomcat jars in the build path.
+									logger.debug("Exception when consuming and flushing data from " + sourceDesc.getSource(), ex);
+								} else { 
+									logger.error("Exception when consuming and flushing data from " + sourceDesc.getSource() + "-->" + ex.toString(), ex);
+								}
+							}
+							pmansProfiler.mark("After event stream " + eventStream.getDescription().getSource());
 						} catch(Exception ex) {
 							if(ex != null && ex.toString() != null && ex.toString().contains("ClientAbortException")) {
 								// We check for ClientAbortException etc this way to avoid including tomcat jars in the build path.
-								logger.debug("Exception when consuming and flushing data from " + sourceDesc.getSource(), ex);
+								logger.debug("Exception when consuming and flushing data from " + (sourceDesc != null ? sourceDesc.getSource() : "N/A"), ex);
 							} else { 
-								logger.error("Exception when consuming and flushing data from " + sourceDesc.getSource() + "-->" + ex.toString(), ex);
+								logger.error("Exception when consuming and flushing data from " + (sourceDesc != null ? sourceDesc.getSource() : "N/A") + "-->" + ex.toString(), ex);
 							}
 						}
-						pmansProfiler.mark("After event stream " + eventStream.getDescription().getSource());
-					} catch(Exception ex) {
-						if(ex != null && ex.toString() != null && ex.toString().contains("ClientAbortException")) {
-							// We check for ClientAbortException etc this way to avoid including tomcat jars in the build path.
-							logger.debug("Exception when consuming and flushing data from " + (sourceDesc != null ? sourceDesc.getSource() : "N/A"), ex);
-						} else { 
-							logger.error("Exception when consuming and flushing data from " + (sourceDesc != null ? sourceDesc.getSource() : "N/A") + "-->" + ex.toString(), ex);
+					}
+
+					// TODO Go through data from other appliances here
+
+					if(postProcessor instanceof PostProcessorWithConsolidatedEventStream) { 
+						try(EventStream eventStream = ((PostProcessorWithConsolidatedEventStream) postProcessor).getConsolidatedEventStream()) {
+							EventStreamDesc sourceDesc = eventStream.getDescription();
+							if(sourceDesc == null) {
+								logger.error("Skipping event stream without a desc for pv " + pvName + " and post processor " + postProcessor.getExtension());
+							} else { 
+								mergeDedupCountingConsumer.consumeEventStream(eventStream);
+								resp.flushBuffer();
+							}
 						}
 					}
-				}
-				
-				// TODO Go through data from other appliances here
-					
-				if(postProcessor instanceof PostProcessorWithConsolidatedEventStream) { 
-					try(EventStream eventStream = ((PostProcessorWithConsolidatedEventStream) postProcessor).getConsolidatedEventStream()) {
-						EventStreamDesc sourceDesc = eventStream.getDescription();
-						if(sourceDesc == null) {
-							logger.error("Skipping event stream without a desc for pv " + pvName + " and post processor " + postProcessor.getExtension());
-						} else { 
-							mergeDedupCountingConsumer.consumeEventStream(eventStream);
+
+					// If the postProcessor needs to send final data across, give it a chance now...
+					if(postProcessor instanceof AfterAllStreams) {
+						EventStream finalEventStream = ((AfterAllStreams)postProcessor).anyFinalData();
+						if(finalEventStream != null) { 
+							mergeDedupCountingConsumer.consumeEventStream(finalEventStream);
 							resp.flushBuffer();
 						}
 					}
+
+					pmansProfiler.mark("After writing all eventstreams to response");
 				}
-		
-				// If the postProcessor needs to send final data across, give it a chance now...
-				if(postProcessor instanceof AfterAllStreams) {
-					EventStream finalEventStream = ((AfterAllStreams)postProcessor).anyFinalData();
-					if(finalEventStream != null) { 
-						mergeDedupCountingConsumer.consumeEventStream(finalEventStream);
-						resp.flushBuffer();
-					}
-				}
-				
-				pmansProfiler.mark("After writing all eventstreams to response");
 			}
 		} catch(Exception ex) {
 			if(ex != null && ex.toString() != null && ex.toString().contains("ClientAbortException")) {
@@ -1049,7 +1087,7 @@ public class DataRetrievalServlet  extends HttpServlet {
 		pmansProfiler.mark("After all closes and flushing all buffers");
 			
 		// Till we determine all the if conditions where we log this, we log sparingly..
-		if(pmansProfiler.totalTimeMS() > 5000) { 
+		if(pmansProfiler.totalTimeMS()/pvNames.size() > 5000) { 
 			logger.error("Retrieval time for " + StringUtils.join(pvNames, ", ") + " from " + startTimeStr + " to " + endTimeStr + ": " + pmansProfiler.toString());
 		}
 		
@@ -1156,7 +1194,7 @@ public class DataRetrievalServlet  extends HttpServlet {
 //					resp.addHeader("Transfer-Encoding", "chunked");
 //				}
 				logger.info("Using " + mimemappinginfo.mimeresponseClass.getName() + " as the mime response sending " + ctype);
-				MimeResponse mimeresponse = (MimeResponse) mimemappinginfo.mimeresponseClass.newInstance();
+				MimeResponse mimeresponse = (MimeResponse) mimemappinginfo.mimeresponseClass.getConstructor().newInstance();
 				HashMap<String, String> extraHeaders = mimeresponse.getExtraHeaders();
 				if(extraHeaders != null) { 
 					for(Entry<String, String> kv : extraHeaders.entrySet()) { 
@@ -1186,7 +1224,7 @@ public class DataRetrievalServlet  extends HttpServlet {
 	 * @return
 	 * @throws IOException
 	 */
-	private PVTypeInfo checkIfPVisServedByExternalServer(String pvName, Timestamp start, HttpServletRequest req, HttpServletResponse resp, boolean useChunkedEncoding) throws IOException {
+	private PVTypeInfo checkIfPVisServedByExternalServer(String pvName, Timestamp start, Timestamp end, HttpServletRequest req, HttpServletResponse resp, boolean useChunkedEncoding) throws IOException {
 		PVTypeInfo typeInfo = null;
 		// See if external EPICS archiver appliances have this PV.
 		Map<String, String> externalServers = configService.getExternalArchiverDataServers();
@@ -1201,9 +1239,42 @@ public class DataRetrievalServlet  extends HttpServlet {
 						Map<String, String> areWeArchivingPV = (Map<String, String>) areWeArchivingPVObj;
 						if(areWeArchivingPV.containsKey("status") && Boolean.parseBoolean(areWeArchivingPV.get("status"))) {
 							logger.info("Proxying data retrieval for pv " + pvName + " to " + serverUrl);
-							proxyRetrievalRequest(req, resp, pvName, useChunkedEncoding, serverUrl  + "/data" );
+							try(BasicContext context = new BasicContext()) {
+								StoragePlugin hplg = StoragePluginURLParser.parseStoragePlugin("pbraw://localhost?rawURL=" + serverUrl + "/data/getData.raw&name=ext", configService);
+								logger.debug(hplg.getDescription());
+								List<Callable<EventStream>> callables = hplg.getDataForPV(context, pvName, TimeUtils.minusHours(end, 1), end, null);
+								if(callables == null || callables.isEmpty()) {
+									logger.info("No data from remote server " + serverUrl + " for pv " + pvName);
+								} else {
+									for(Callable<EventStream> callable : callables){
+										try(EventStream strm = callable.call()) {
+											if(strm != null) {
+												Iterator<Event> it = strm.iterator();
+												if(it.hasNext()) {
+													Event e = it.next();
+													ArchDBRTypes dbrType = strm.getDescription().getArchDBRType();
+													typeInfo = new PVTypeInfo(pvName, dbrType, !dbrType.isWaveForm(), e.getSampleValue().getElementCount());
+													typeInfo.setApplianceIdentity(configService.getMyApplianceInfo().getIdentity());
+													// Somehow tell the code downstream that this is a fake typeInfo.
+													typeInfo.setSamplingMethod(SamplingMethod.DONT_ARCHIVE);
+													typeInfo.setDataStores(new String[] {"pbraw://localhost?rawURL=" + serverUrl + "/data/getData.raw"} );
+													logger.debug("Done creating a temporary typeinfo for pv " + pvName);
+													return typeInfo;
+												}
+											} else {
+												logger.info("Empty stream from remote server" + serverUrl + " for pv " + pvName);
+											}
+										} catch(Exception ex) {
+											logger.error("Exception trying to determine typeinfo for pv " + pvName + " from external server " + serverUrl, ex);
+											typeInfo = null;
+										}
+									}
+								}
+							} catch(Exception ex) {
+								logger.error("Exception trying to determine typeinfo for pv " + pvName + " from external server " + serverUrl, ex);
+								typeInfo = null;
+							}
 						}
-						return null;
 					}
 				}
 			}

@@ -262,13 +262,14 @@
 	  	  <enable/>
 	  	</assertions>
 	  	<jvmarg value="-Dlog4j.configuration=log4j.properties"/>
+	  	<jvmarg value="-Dwebdriver.gecko.driver=./lib/test/geckodriver-v0.24.0-linux64/geckodriver"/>
 	  	<env key="ARCHAPPL_SHORT_TERM_FOLDER" path="./sts"/>
 	  	<env key="ARCHAPPL_MEDIUM_TERM_FOLDER" path="./mts"/>
 	  	<env key="ARCHAPPL_LONG_TERM_FOLDER" path="./lts"/>
 	  </junit>
 	</target>
 	
-	<target name="singletest" depends="compile" description="Runs the test you specify on the command line with -Dtest=. For example, ant -Dtest=DBRTypeTest singletest">
+	<target name="singletest" depends="wars" description="Runs the test you specify on the command line with -Dtest=. For example, ant -Dtest=DBRTypeTest singletest">
 	  <junit fork="yes" haltonfailure="yes" printsummary="on" showoutput="yes" maxmemory="4096M">
 	    <batchtest fork="yes">
 	      <fileset dir="${test.dir}">
@@ -296,6 +297,7 @@
 	  	  <enable/>
 	  	</assertions>
 	  	<jvmarg value="${log4jprops}"/>
+	  	<jvmarg value="-Dwebdriver.gecko.driver=./lib/test/geckodriver-v0.24.0-linux64/geckodriver"/>
 	  	<env key="ARCHAPPL_SHORT_TERM_FOLDER" path="./sts"/>
 	  	<env key="ARCHAPPL_MEDIUM_TERM_FOLDER" path="./mts"/>
 	  	<env key="ARCHAPPL_LONG_TERM_FOLDER" path="./lts"/>
@@ -330,6 +332,7 @@
 	  	  <enable/>
 	  	</assertions>
 	  	<jvmarg value="${log4jprops}"/>
+	  	<jvmarg value="-Dwebdriver.gecko.driver=./lib/test/geckodriver-v0.24.0-linux64/geckodriver"/>
 	  	<jvmarg value="-Xdebug"/>
 	  	<jvmarg value="-Xrunjdwp:transport=dt_socket,address=17667,server=y,suspend=y"/>
 	  </junit>
@@ -365,7 +368,7 @@
 		           author="true"
 		           version="true"
 		           use="true"
-		  	       link="http://docs.oracle.com/javase/8/docs/api/">
+		  	       link="https://docs.oracle.com/en/java/javase/12/docs/api/">
     	    <classpath>
     	    	<pathelement path="${classes}"/>
     	        <fileset dir="lib/test">

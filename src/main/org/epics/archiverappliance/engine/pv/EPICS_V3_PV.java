@@ -324,15 +324,6 @@ public class EPICS_V3_PV implements PV, ControllingPV, ConnectionListener, Monit
 		PVContext.setConfigservice(configservice);
 	}
 	
-	/** Use finalize as last resort for cleanup, but give warnings. */
-	@Override
-	protected void finalize() throws Throwable {
-		super.finalize();
-		if (channel_ref != null) {
-			stop();
-		}
-	}
-	
 	/** @return Returns the name. */
 	@Override
 	public String getName() {
@@ -418,17 +409,20 @@ public class EPICS_V3_PV implements PV, ControllingPV, ConnectionListener, Monit
 		synchronized (this) {
 			// Prevent multiple subscriptions.
 			if (subscription != null) {
+				logger.error("When trying to establish a subscription, there is already a subscription for " + this.name);
 				return;
 			}
 			// Late callback, channel already closed?
 			final RefCountedChannel ch_ref = channel_ref;
 			if (ch_ref == null) {
+				logger.error("When trying to establish a subscription, the refcounted channel is closed for " + this.name);
 				return;
 			}
 			final Channel channel = ch_ref.getChannel();
 			// final Logger logger = Activator.getLogger();
 			try {
 				if(channel.getConnectionState()!=Channel.CONNECTED){
+					logger.error("When trying to establish a subscription, the CA channel is not connected for " + this.name);
 					return;
 				}
 				//
@@ -576,14 +570,17 @@ public class EPICS_V3_PV implements PV, ControllingPV, ConnectionListener, Monit
 	private void handleConnected(final Channel channel) {
 		try { 
 			if(channel.getConnectionState()!=Channel.CONNECTED){
+				logger.error("While processing a handleConnected for " + this.name + "; the channel is not in a connected state.");
 				return;
 			}
 		} catch(Exception ex) { 
-			logger.warn("Exception handling connection state change for " + this.name, ex);
+			logger.error("Exception handling connection state change for " + this.name, ex);
 			return;
 		}
-		if (state == PVConnectionState.Connected)
+		if (state == PVConnectionState.Connected) {
+			logger.error("While processing a handleConnected for " + this.name + "; the state is already in a connected state.");
 			return;
+		}
 		state = PVConnectionState.Connected;
 		hostName=channel.getHostName();
 		totalMetaInfo.setHostName(hostName);
@@ -594,6 +591,7 @@ public class EPICS_V3_PV implements PV, ControllingPV, ConnectionListener, Monit
 		// then subscribe.
 		// Otherwise, we're done.
 		if (!running) {
+			logger.warn("While processing a handleConnected for " + this.name + " the channel is not running.");
 			connected = true;
 			// meta = null;
 			synchronized (this) {
@@ -601,6 +599,7 @@ public class EPICS_V3_PV implements PV, ControllingPV, ConnectionListener, Monit
 			}
 			return;
 		}
+		
 		// else: running, get meta data, then subscribe
 		try {
 			DBRType type = channel.getFieldType();
@@ -962,5 +961,10 @@ public class EPICS_V3_PV implements PV, ControllingPV, ConnectionListener, Monit
 		} else {
 			logger.error("In applyBasicInfo, cannot determine dbr type for " + (dbr != null ? dbr.getClass().getName() : "Null DBR"));
 		}
+	}
+
+	@Override
+	public void sampleWrittenIntoStores() {
+		
 	}
 }

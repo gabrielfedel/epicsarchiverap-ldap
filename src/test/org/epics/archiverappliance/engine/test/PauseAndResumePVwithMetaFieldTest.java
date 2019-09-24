@@ -71,6 +71,10 @@ public class PauseAndResumePVwithMetaFieldTest extends TestCase {
 			assertTrue("the channel for " + pvName
 					+ " should be created but it is not",
 					archiveChannel != null);
+			// Clear the sample buffers and then wait for part of the engine write thread period.
+			archiveChannel.getSampleBuffer().getCurrentSamples().clear();
+			Thread.sleep(5*1000);
+			
 			boolean hasData = archiveChannel.getSampleBuffer()
 					.getCurrentSamples().size() > 0;
 			assertTrue("the channel for " + pvName
@@ -125,10 +129,6 @@ public class PauseAndResumePVwithMetaFieldTest extends TestCase {
 					tempPVMetrics3.isConnected());
 			archiveChannel = testConfigService
 					.getEngineContext().getChannelList().get(pvName);
-			boolean hasData3 = archiveChannel.getSampleBuffer()
-					.getCurrentSamples().size() > 0;
-			assertTrue("the channel for " + pvName
-					+ " should have data but it don't", hasData3);
 
 			// check meta field
 			for (String metaFieldTemp : metaFields) {
