@@ -200,9 +200,10 @@ function archivePVsWithDetails() {
 
 }
 
-// We assume that dataobject has a attribute called pvName and that we are in the mgmt/ui context. 
+// We assume that dataobject has an attribute called pvName and that we are in the mgmt/ui context. 
 //var dataRetrievalURL = null;
-var dataRetrievalURL = "http:" + window.location.href.split(":")[1] + ":31998/retrieval"
+var baseUrl = "http:" + window.location.href.split(":")[1];
+var dataRetrievalURL = baseUrl + ":31998/retrieval";
 function quickChartButton(dataobject) {
 	var canvasSupported = !!window.HTMLCanvasElement;
 	if(!canvasSupported) { 
@@ -227,7 +228,7 @@ function quickChartButton(dataobject) {
 		alert("Cannot determine data retrieval URL");
 	}
 	
-    return '<div style = "text-align: center;"><a target="_blank" href="' + dataRetrievalURL + '/ui/archiver-viewer/index.html?pv=' + encodeURIComponent(dataobject.pvName) + '" >Option #1</a> | <a target="_blank" href="' + dataRetrievalURL + '/ui/viewer/archViewer.html?pv=' + encodeURIComponent(dataobject.pvName) + '" >Option #2</a></div>';
+    return '<div style="text-align: center;"><a target="_blank" href="' + baseUrl + '/archiver-viewer/index.html?pv=' + encodeURIComponent(dataobject.pvName) + '" >Option #1</a></div>';
 }
 
 
