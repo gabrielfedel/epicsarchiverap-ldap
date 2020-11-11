@@ -42,6 +42,7 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 import javax.servlet.ServletContext;
 
@@ -84,6 +85,7 @@ import com.google.common.eventbus.EventBus;
 import com.google.common.eventbus.Subscribe;
 import com.hazelcast.client.HazelcastClient;
 import com.hazelcast.client.config.ClientConfig;
+import com.hazelcast.client.config.XmlClientConfigBuilder;
 import com.hazelcast.config.Config;
 import com.hazelcast.config.XmlConfigBuilder;
 import com.hazelcast.core.Cluster;
@@ -533,7 +535,14 @@ public class DefaultConfigService implements ConfigService {
 			// All other webapps are "native" clients.
 			try { 
 				configlogger.debug("Initializing a non-mgmt webapp's clustering");
-				ClientConfig clientConfig = new ClientConfig();
+				/*
+				 * Loads the client config using the following resolution mechanism:
+				 *   1. first it checks if a system property 'hazelcast.client.config' is set. If it exist and it begins with 'classpath:', then a classpath resource is loaded. Else it will assume it is a file reference
+				 *   2. it checks if a hazelcast-client.xml is available in the working dir
+				 *   3. it checks if a hazelcast-client.xml is available on the classpath
+				 *   4. it loads the hazelcast-client-default.xml
+				 */
+				ClientConfig clientConfig = new XmlClientConfigBuilder().build();
 				clientConfig.getGroupConfig().setName("archappl");
 				clientConfig.getGroupConfig().setPassword("archappl");
 				clientConfig.setExecutorPoolSize(4);
@@ -562,6 +571,12 @@ public class DefaultConfigService implements ConfigService {
 					Logger.getLogger("com.hazelcast.client.spi.impl.ClusterListenerThread").setLevel(Level.OFF);
 					Logger.getLogger("com.hazelcast.client.spi.ClientPartitionService").setLevel(Level.OFF);
 				}
+				configlogger.info("client network config conn attempt limit: " + clientConfig.getNetworkConfig().getConnectionAttemptLimit());
+				configlogger.info("client network config conn attempt period: " + clientConfig.getNetworkConfig().getConnectionAttemptPeriod());
+				configlogger.info("client network config conn timeout: " + clientConfig.getNetworkConfig().getConnectionTimeout());
+				configlogger.info("client network config addresses: " + clientConfig.getNetworkConfig().getAddresses().stream().map(Object::toString).collect(Collectors.joining(",")));
+				configlogger.info("client network config is redo: " + clientConfig.getNetworkConfig().isRedoOperation());
+				configlogger.info("client config properties: " + clientConfig.getProperties().toString());
 				hzinstance = HazelcastClient.newHazelcastClient(clientConfig);
 			} catch(Exception ex) {
 				throw new ConfigException("Exception adding client to cluster", ex);
@@ -935,10 +950,16 @@ public class DefaultConfigService implements ConfigService {
 	public Collection<ApplianceInfo> getAppliancesInCluster() {
 		ArrayList<ApplianceInfo> sortedAppliances = new ArrayList<ApplianceInfo>();
 		for(ApplianceInfo info : appliances.values()) {
-			if(appliancesInCluster.contains(info.getIdentity())) {
-				sortedAppliances.add(info);
+			if(this.getWarFile() == WAR_FILE.MGMT) {
+				if(appliancesInCluster.contains(info.getIdentity())) {
+					sortedAppliances.add(info);
+				} else {
+					logger.debug("Skipping appliance that is in the persistence but not in the cluster" + info.getIdentity());
+				}
 			} else {
-				logger.debug("Skipping appliance that is in the persistence but not in the cluster" + info.getIdentity());
+				// For non-mgmt apps, we add all the appliances into this call.
+				// This is because, the non-mgmt webapps are Hz clients; they do not receive the instance change events. So, appliancesInCluster is always empty.
+				sortedAppliances.add(info); 
 			}
 		}
 		
@@ -1021,27 +1042,38 @@ public class DefaultConfigService implements ConfigService {
 	public boolean isBeingArchivedOnThisAppliance(String pvName) {
 		boolean isField = PVNames.isField(pvName);
 		String plainPVName = PVNames.stripFieldNameFromPVName(pvName);
-		if(this.pvsForThisAppliance.contains(plainPVName)) {  
-			if(isField) {
-				PVTypeInfo typeInfo = this.getTypeInfoForPV(plainPVName);
-				if(typeInfo != null && Arrays.asList(typeInfo.getArchiveFields()).contains(PVNames.getFieldName(pvName))) { 
-					return true;
-				}
-			} else { 
+		String fieldName = PVNames.getFieldName(pvName);
+		if(isField) {
+			// If this is a field, we have two possibilities. 
+			// Either the plainPVname is being archived and the field is an extra field
+			// Or the whole pv (with the field) is being archived.
+			if(this.pvsForThisAppliance.contains(pvName) 
+					|| (this.pvsForThisAppliance.contains(plainPVName) && Arrays.asList(this.getTypeInfoForPV(plainPVName).getArchiveFields()).contains(fieldName))) {
+				return true;
+			}
+			
+		} else {
+			if(this.pvsForThisAppliance.contains(plainPVName)) {
 				return true;
 			}
 		}
 		
+		if(this.aliasNamesToRealNames.containsKey(pvName) && this.pvsForThisAppliance.contains(this.aliasNamesToRealNames.get(pvName))) {
+			return true;
+		}
+		
+		
 		if(this.aliasNamesToRealNames.containsKey(plainPVName)) { 
 			plainPVName = this.aliasNamesToRealNames.get(plainPVName);
 
-			if(this.pvsForThisAppliance.contains(plainPVName)) {  
-				if(isField) {
-					PVTypeInfo typeInfo = this.getTypeInfoForPV(plainPVName);
-					if(typeInfo != null && Arrays.asList(typeInfo.getArchiveFields()).contains(PVNames.getFieldName(pvName))) { 
-						return true;
-					}
-				} else { 
+			if(isField) {
+				if(this.pvsForThisAppliance.contains(PVNames.transferField(pvName, plainPVName)) 
+						|| (this.pvsForThisAppliance.contains(plainPVName) && Arrays.asList(this.getTypeInfoForPV(plainPVName).getArchiveFields()).contains(fieldName))) {
+					return true;
+				}
+				
+			} else {
+				if(this.pvsForThisAppliance.contains(plainPVName)) {
 					return true;
 				}
 			}
