@@ -39,7 +39,7 @@
        <filter-name>MgmtAuthenticationFilter</filter-name>
        <url-pattern>/bpl/archivePV</url-pattern>
        <url-pattern>/bpl/pauseArchivingPV</url-pattern>
-       <url-pattern>/bpl/pauseArchivingPV</url-pattern>
+       <url-pattern>/bpl/resumeArchivingPV</url-pattern>
        <url-pattern>/bpl/consolidateDataForPV</url-pattern>
        <url-pattern>/bpl/deletePV</url-pattern>
        <url-pattern>/bpl/abortArchivingPV</url-pattern>
