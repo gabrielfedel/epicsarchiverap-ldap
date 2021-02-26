@@ -105,7 +105,7 @@ public class GetDataAtTime {
 	
 	private static HashMap<String, HashMap<String, Object>>  getDataFromRemoteArchApplicance(String applianceRetrievalURL, LinkedList<String> remainingPVs, Timestamp atTime) {
 		try {
-			if(remainingPVs.size() <= 0) { return null; } ;
+			if(remainingPVs.size() <= 0) { return null; } 
 			HashMap<String, HashMap<String, Object>> resp = GetUrlContent.postStringListAndGetJSON(applianceRetrievalURL + "?at="+TimeUtils.convertToISO8601String(atTime)+"&includeProxies=false", "pv", remainingPVs);
 			if(resp == null) return null;
 			logger.debug("Done calling remote appliance at " + applianceRetrievalURL + " and got PV count " +  + ((resp != null) ? resp.size() : 0));
@@ -284,26 +284,27 @@ public class GetDataAtTime {
 					List<Callable<EventStream>> streams = storagePlugin.getDataForPV(context, pvName, startTime, atTime, postProcessor);
 					if(streams != null) {
 						for(Callable<EventStream> stcl : streams) {
-							EventStream stream = stcl.call();
-							for(Event e : stream) {
-								dEv = (DBRTimeEvent) e;
-								if(dEv.getEventTimeStamp().before(atTime) || dEv.getEventTimeStamp().equals(atTime)) {
-									if(potentialEvent != null) {
-										if(dEv.getEventTimeStamp().after(potentialEvent.getEventTimeStamp())) {
-											potentialEvent = (DBRTimeEvent) dEv.makeClone();							
+							try(EventStream stream = stcl.call()) {
+								for(Event e : stream) {
+									dEv = (DBRTimeEvent) e;
+									if(dEv.getEventTimeStamp().before(atTime) || dEv.getEventTimeStamp().equals(atTime)) {
+										if(potentialEvent != null) {
+											if(dEv.getEventTimeStamp().after(potentialEvent.getEventTimeStamp())) {
+												potentialEvent = (DBRTimeEvent) dEv.makeClone();							
+											}
+										} else {
+											potentialEvent = dEv;
 										}
 									} else {
-										potentialEvent = dEv;
-									}
-								} else {
-									if(potentialEvent != null) {
-										HashMap<String, Object> evnt = new HashMap<String, Object>();
-										evnt.put("secs", potentialEvent.getEpochSeconds());
-										evnt.put("nanos", potentialEvent.getEventTimeStamp().getNanos());
-										evnt.put("severity", potentialEvent.getSeverity());
-										evnt.put("status", potentialEvent.getStatus());
-										evnt.put("val", JSONValue.parse(potentialEvent.getSampleValue().toJSONString()));
-										return new PVWithData(nameFromUser, evnt);
+										if(potentialEvent != null) {
+											HashMap<String, Object> evnt = new HashMap<String, Object>();
+											evnt.put("secs", potentialEvent.getEpochSeconds());
+											evnt.put("nanos", potentialEvent.getEventTimeStamp().getNanos());
+											evnt.put("severity", potentialEvent.getSeverity());
+											evnt.put("status", potentialEvent.getStatus());
+											evnt.put("val", JSONValue.parse(potentialEvent.getSampleValue().toJSONString()));
+											return new PVWithData(nameFromUser, evnt);
+										}
 									}
 								}
 							}

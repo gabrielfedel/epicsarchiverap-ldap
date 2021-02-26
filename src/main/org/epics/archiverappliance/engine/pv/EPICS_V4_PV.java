@@ -7,6 +7,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 
+import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.epics.archiverappliance.common.TimeUtils;
 import org.epics.archiverappliance.config.ArchDBRTypes;
@@ -101,9 +102,12 @@ public class EPICS_V4_PV implements PV, ChannelGetRequester, ChannelRequester, M
     private ArrayList<String> bit2fieldNames = new ArrayList<String>();
     
     /**
-     * The bitset bit for the timestamp; we use this to see if record processing happened.
+     * The bitset bits for the timestamp; we use this to see if record processing happened.
+     * This is all the bits that could indicate if the timestamp has changed.
+     * We automatically add 0 to this bitset.
+     * Normally, for EPICS PVAccess PV's the timestamp is in the top level structure; so we add that and all the child fields of the timestamp.
      */
-    private int timeStampBitSetBit = -1;
+    private BitSet timeStampBits = new BitSet();
     
     /**
      * Current value of the fields; V3 name of the field to the string version of the value.
@@ -281,8 +285,7 @@ public class EPICS_V4_PV implements PV, ChannelGetRequester, ChannelRequester, M
 
 	@Override
 	public void updateTotalMetaInfo() throws IllegalStateException {
-		// TODO cleanup this interface and implements this.
-		throw new UnsupportedOperationException();
+		// We should not need to do anyting here as we should get updates on any field change for PVAccess and we do not need to do an explicit get. 
 	}
 
 	@Override
@@ -299,10 +302,20 @@ public class EPICS_V4_PV implements PV, ChannelGetRequester, ChannelRequester, M
 	public String getRequesterName() {
 		return this.getClass().getName() + "\tchannelName:" + this.name;
 	}
+	
+	private static HashMap<MessageType, Level> lvl2lvl = getPVAccessMessageType2Log4jLevels();
+	private static HashMap<MessageType, Level> getPVAccessMessageType2Log4jLevels() { 
+		HashMap<MessageType, Level> ret = new HashMap<MessageType, Level>();
+		ret.put(MessageType.info, Level.INFO);
+		ret.put(MessageType.warning, Level.WARN);
+		ret.put(MessageType.error, Level.ERROR);
+		ret.put(MessageType.fatalError, Level.FATAL);
+		return ret;
+	}
 
 	@Override
-	public void message(String arg0, MessageType arg1) {
-		logger.info(arg1);
+	public void message(String message, MessageType mtype) {
+		logger.log(lvl2lvl.get(mtype), message);
 	}
 
 	@Override
@@ -376,10 +389,10 @@ public class EPICS_V4_PV implements PV, ChannelGetRequester, ChannelRequester, M
 		    			
 		    			String fName = bit2fieldNames.get(i);
 		    			// We filter => map => filter => compare => save
-						if(fName.startsWith("value") || fName.startsWith("timeStamp.") || fName.startsWith("alarm.")) {
+						if(fName.equals("") || fName.startsWith("value.") || fName.startsWith("timeStamp.") || fName.startsWith("alarm.")) {
 		    				// logger.fine("Filtering out field that is already stored with event " + fName);
 		    			} else {
-		    				// logger.fine("Field " + fName + " has changed");
+		    				logger.debug("Field " + fName + " has changed");
 		    				updateCurrentFieldValueForKey(monitorElement.getPVStructure(), fName);
 		    			}
 		    		}
@@ -388,11 +401,14 @@ public class EPICS_V4_PV implements PV, ChannelGetRequester, ChannelRequester, M
 		    		// We use the timestamp to ascertain this fact.
 		    		// We store fields as part of the next record processing event.
 		    		// If this is not a record processing event, skip this.
-		    		if(!bs.get(this.timeStampBitSetBit)) {
+		    		if(!bs.intersects(this.timeStampBits)) {
 		    			logger.debug("Timestamp has not changed; most likely this is a update to the properties for pv " + this.name);
+		    			logger.debug("Timestamp bits " + this.timeStampBits + " Changed bits " + monitorElement.getChangedBitSet());
+//		    			for(PVField fld : totalPVStructure.getPVFields()) {
+//		    				logger.debug("Field " + fld.getFieldName() + " has offset " + fld.getFieldOffset());
+//		    			}
 		    			return;
 		    		}
-		    		
 		    		
 		    		if(!this.changedFieldValuesForThisEvent.isEmpty()) {
 		    			for(String key: this.changedFieldValuesForThisEvent.keySet()) {
@@ -418,8 +434,6 @@ public class EPICS_V4_PV implements PV, ChannelGetRequester, ChannelRequester, M
 
 
 					fireValueUpdate();
-
-					this.changedFieldValuesForThisEvent.clear();
 										
 				} catch (Exception e) {
 					logger.error("exception in monitor changed function when converting DBR to dbrtimeevent", e);
@@ -485,7 +499,13 @@ public class EPICS_V4_PV implements PV, ChannelGetRequester, ChannelRequester, M
 	@Override
 	public void getDone(final Status status, ChannelGet arg1, final PVStructure pvStructure, BitSet arg3) {
 		logger.debug("Construct the bitset to field name mapping for PV " + this.getName());
+		this.timeStampBits.set(0, true);
 		add2BitFieldMapping("", pvStructure.getStructure(), bit2fieldNames);
+		if(this.timeStampBits.isEmpty()) {
+			logger.error("Cannot determine the timestamp bitset for PV " + this.name + ". This means we may not save any data at all for this PV.");
+		} else {
+			logger.debug("The timestamp bits for the PV " + this.name + " are " + this.timeStampBits);
+		}
 		updateCurrentFieldValues(null, pvStructure);
 
 		this.scheduleCommand(new Runnable() {
@@ -729,8 +749,8 @@ public class EPICS_V4_PV implements PV, ChannelGetRequester, ChannelRequester, M
                 mapping.add(fldName);
                 for(String fieldName : ((Structure)fld).getFieldNames()) {
                     String fulFldName = makeFullFieldName(fldName, fieldName);
-                    if(fulFldName.equals("timeStamp")) {
-                    	this.timeStampBitSetBit = mapping.size();
+                    if(fulFldName.startsWith("timeStamp")) {
+                    	this.timeStampBits.set(mapping.size(), true);
                     }
 					add2BitFieldMapping(fulFldName, ((Structure)fld).getField(fieldName), mapping);
                 }
@@ -779,23 +799,25 @@ public class EPICS_V4_PV implements PV, ChannelGetRequester, ChannelRequester, M
 
     private void updateCurrentFieldValues(String rootName, PVStructure pvStructure) {
     	for(PVField pvField: pvStructure.getPVFields()) {
+    		String fieldName = pvField.getFieldName();
+    		if(fieldName.equals("value")) continue;
             switch(pvField.getField().getType()) {
             case scalar:
             	this.currentFieldValues.put(makeFullFieldName(rootName , pvField.getFieldName()), getScalarField(pvField));
             	break;
             case scalarArray:
-    			throw new UnsupportedOperationException();
+    			break;
             case structure:
             	updateCurrentFieldValues(makeFullFieldName(rootName, pvField.getFieldName()), ((PVStructure)pvField));
                 break;
             case structureArray:
-    			throw new UnsupportedOperationException();
+    			break;
             case union:
-    			throw new UnsupportedOperationException();
+    			break;
             case unionArray:
-    			throw new UnsupportedOperationException();
+    			break;
             default:
-    			throw new UnsupportedOperationException();
+    			break;
             }
     	}
     }
@@ -832,4 +854,9 @@ public class EPICS_V4_PV implements PV, ChannelGetRequester, ChannelRequester, M
     		}
     	}
     }
+
+	@Override
+	public void sampleWrittenIntoStores() {
+		this.changedFieldValuesForThisEvent.clear();
+	}
 }

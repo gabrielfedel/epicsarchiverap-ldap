@@ -48,6 +48,7 @@ public class GetDataAtTimeEngine implements BPLAction {
 	public void execute(HttpServletRequest req, HttpServletResponse resp,
 			ConfigService configService) throws IOException {
 		List<String> pvNames = PVsMatchingParameter.getPVNamesFromPostBody(req, configService);
+		logger.debug("Getting data at time for PVs " + pvNames.size());
 		
 		String timeStr = req.getParameter("at");
 		Timestamp atTime = TimeUtils.now();
@@ -77,7 +78,9 @@ public class GetDataAtTimeEngine implements BPLAction {
 				for(Event ev : st) {
 					potentialEvent = evaluatePotentialEvent(atTime, (DBRTimeEvent) ev, potentialEvent, fieldIsEmbeddedInStream, fieldName);
 				}
-				potentialEvent = evaluatePotentialEvent(atTime, archiveChannel.getLastArchivedValue(), potentialEvent, fieldIsEmbeddedInStream, fieldName);
+				if(archiveChannel.getLastArchivedValue() != null) {
+					potentialEvent = evaluatePotentialEvent(atTime, archiveChannel.getLastArchivedValue(), potentialEvent, fieldIsEmbeddedInStream, fieldName);
+				}
 				
 				if(potentialEvent != null) {
 					HashMap<String, Object> evnt = new HashMap<String, Object>();

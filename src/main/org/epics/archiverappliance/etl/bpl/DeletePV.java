@@ -66,6 +66,8 @@ public class DeletePV implements BPLAction {
 			configService.getETLLookup().deleteETLJobs(pvName);
 			
 			if(deleteData) {
+				HashMap<String, String> timingValues = new HashMap<String, String>();
+				infoValues.put("deletes_timing", timingValues);
 				try(ETLContext context = new ETLContext()) {
 					Timestamp tenYearsLaterTimeStamp = TimeUtils.convertFromEpochSeconds(TimeUtils.getCurrentEpochSeconds()+10*365*24*60*60, 0);
 					for(String dataSource : typeInfo.getDataStores()) {
@@ -75,11 +77,13 @@ public class DeletePV implements BPLAction {
 							List<ETLInfo> infos = etlSource.getETLStreams(pvName, tenYearsLaterTimeStamp, context);
 							if(infos == null) continue;
 							for(ETLInfo info : infos) {
+								timingValues.put(info.getKey() + ": Start", TimeUtils.convertToHumanReadableString(System.currentTimeMillis()/1000));
 								logger.debug("Marking src " + info.getKey() + " for deletion when stopping archiving pv " + pvName);
 								etlSource.markForDeletion(info, context);
+								timingValues.put(info.getKey() + ": End", TimeUtils.convertToHumanReadableString(System.currentTimeMillis()/1000));
 							}
 						} catch(Exception ex) {
-							logger.debug("Exception deleting data for PV " + pvName, ex);
+							logger.error("Exception deleting data for PV " + pvName, ex);
 						}
 					}
 				}
