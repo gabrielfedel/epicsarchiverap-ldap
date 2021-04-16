@@ -204,6 +204,7 @@ function archivePVsWithDetails() {
 //var dataRetrievalURL = null;
 var baseUrl = "http:" + window.location.href.split(":")[1];
 var dataRetrievalURL = baseUrl + ":31998/retrieval";
+var viewerUrl = window.location.protocol + "//" + window.location.host + "/archiver-viewer/index.html";
 function quickChartButton(dataobject) {
 	var canvasSupported = !!window.HTMLCanvasElement;
 	if(!canvasSupported) { 
@@ -228,7 +229,7 @@ function quickChartButton(dataobject) {
 		alert("Cannot determine data retrieval URL");
 	}
 	
-    return '<div style="text-align: center;"><a target="_blank" href="' + baseUrl + '/archiver-viewer/index.html?pv=' + encodeURIComponent(dataobject.pvName) + '" >Option #1</a></div>';
+    return '<div style="text-align: center;"><a target="_blank" href="' + viewerUrl + '?pv=' + encodeURIComponent(dataobject.pvName) + '" >Option #1</a></div>';
 }
 
 
